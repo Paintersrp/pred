@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %} 
+Rankings 
+{% endblock %}
+
+{% block section1 %}
+    <div class="row mt-3">
+        <div class="col-xl-12">
+            <div id="test" class="row">
+                {% for table in table %}
+                    <div class="col-xl-10 offset-md-1 offset-sm-0">
+                        {{headers[loop.index]}}
+                        {{table | safe}}
+                    </div>
+                 {% endfor %}
+            </div>
+        </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready( function () {
+        $('#data').DataTable({
+            paging: false,
+            info: false,
+            searching: false,
+            responsive: true,
+        });
+    } );
+</script>
+{% endblock %}

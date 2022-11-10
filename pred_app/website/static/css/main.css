@@ -1,0 +1,62 @@
+.table {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 14px;
+    border: 1px solid white;
+    border-color: white;
+}
+
+label {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    color: black;
+    display: block;
+    text-align: center;
+}
+
+button {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+}
+
+nav {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 16px;
+}
+
+thead, th{
+    text-align: center;
+    background-color: bg-dark;
+}
+
+table, th, td {
+    border: 1px solid white;
+    border-collapse: collapse;
+}
+
+.table-dark td, .table-dark th, .table-dark thead th {
+    border: 0.5px solid grey;
+    border-collapse: collapse;
+}
+
+h1 {
+    font-size: 32px;
+}
+
+h6 {
+    text-align: center;
+    border: 0.5px solid grey;
+    font-size: 16px;
+}
+
+#section_head {
+    font-family: 'Arial';
+}
+
+.fluid-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px blue;
+}
+
+img {
+    border: 0.5px solid black;
+}
