@@ -1,3 +1,6 @@
+"""
+Docstring
+"""
 from flask import Blueprint, render_template
 from sqlalchemy import create_engine
 import pandas as pd
@@ -8,6 +11,9 @@ views = Blueprint("views", __name__)
 
 @views.route("/", methods=["GET", "POST"])
 def home_page():
+    """
+    Home Funcstring
+    """
     preds = pd.read_sql_table("today_preds", engine)
     preds.columns = [
         "Win%",
@@ -21,7 +27,7 @@ def home_page():
         "Massey",
         "Net",
         "Win%",
-    ]  # reordering
+    ]
 
     metrics = pd.read_sql_table("metric_scores", engine)
 

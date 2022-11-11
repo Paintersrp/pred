@@ -1,18 +1,21 @@
-from ratings import add_massey, add_elo
+"""
+Docstring
+"""
 import pandas as pd
 import numpy as np
 import utils
+from ratings import add_massey, add_elo
 
 
-def combine_datasets():
-    sets = []
-    sets.extend(
-        [
-            pd.read_csv("TrainDataRawAdv_2005-09.csv"),
-            pd.read_csv("TrainDataRawAdv_2010-14.csv"),
-            pd.read_csv("TrainDataRawAdv_2015-18.csv"),
-            pd.read_csv("TrainDataRawAdv_2019-22.csv"),
-        ]
+def combine_datasets() -> None:
+    """
+    Combines seasons of training data into one
+    """
+    sets = (
+        pd.read_csv("TrainDataRawAdv_2005-09.csv"),
+        pd.read_csv("TrainDataRawAdv_2010-14.csv"),
+        pd.read_csv("TrainDataRawAdv_2015-18.csv"),
+        pd.read_csv("TrainDataRawAdv_2019-22.csv"),
     )
 
     final = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
@@ -20,25 +23,25 @@ def combine_datasets():
     final.to_csv("Train.csv")
 
 
-def combine_odds_dataset():
-    sets = []
-    sets.extend(
-        [
-            pd.read_excel("2007-08.xlsx"),
-            pd.read_excel("2008-09.xlsx"),
-            pd.read_excel("2009-10.xlsx"),
-            pd.read_excel("2010-11.xlsx"),
-            pd.read_excel("2011-12.xlsx"),
-            pd.read_excel("2012-13.xlsx"),
-            pd.read_excel("2013-14.xlsx"),
-            pd.read_excel("2014-15.xlsx"),
-            pd.read_excel("2015-16.xlsx"),
-            pd.read_excel("2016-17.xlsx"),
-            pd.read_excel("2018-19.xlsx"),
-            pd.read_excel("2019-20.xlsx"),
-            pd.read_excel("2020-21.xlsx"),
-            pd.read_excel("2021-22.xlsx"),
-        ]
+def combine_odds_dataset() -> pd.DataFrame:
+    """
+    Combines seasons of odds data into one
+    """
+    sets = (
+        pd.read_excel("2007-08.xlsx"),
+        pd.read_excel("2008-09.xlsx"),
+        pd.read_excel("2009-10.xlsx"),
+        pd.read_excel("2010-11.xlsx"),
+        pd.read_excel("2011-12.xlsx"),
+        pd.read_excel("2012-13.xlsx"),
+        pd.read_excel("2013-14.xlsx"),
+        pd.read_excel("2014-15.xlsx"),
+        pd.read_excel("2015-16.xlsx"),
+        pd.read_excel("2016-17.xlsx"),
+        pd.read_excel("2018-19.xlsx"),
+        pd.read_excel("2019-20.xlsx"),
+        pd.read_excel("2020-21.xlsx"),
+        pd.read_excel("2021-22.xlsx"),
     )
 
     data = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
@@ -56,49 +59,59 @@ def combine_odds_dataset():
     return data
 
 
-def initial_odds_stats(df):
+def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds some new columns to the data for analysis
+    Makes some data adjustments to keep things consistent
+    """
+
+    data = data.drop(data.index[:11500])
+    mask = (data["H_ML"] != "NL") & (data["Spread"] != "PK")
+    data = data.loc[mask].reset_index(drop=True)
+
+    data["H_ML"] = data["H_ML"].replace(",", "").astype(float)
+    data["A_ML"] = data["A_ML"].replace(",", "").astype(float)
+    data["Spread"] = data["Spread"].astype(float)
+    data["H_Status"] = np.where(data["H_ML"] < 0, "Fav", "UD")
+    data["A_Status"] = np.where(data["A_ML"] < 0, "Fav", "UD")
+    data["O/U_Outcome"] = np.where(data["Points"] > data["O/U"], "Over", "Under")
+    data["Spread_Outcome"] = np.where(data["MOV"] > data["Spread"], 1, 0)
+
+    data["Home"] = np.where(
+        data["Home"] == "New Jersey Nets", "Brooklyn Nets", data["Home"]
+    )
+    data["Away"] = np.where(
+        data["Away"] == "New Jersey Nets", "Brooklyn Nets", data["Away"]
+    )
+    data["Home"] = np.where(
+        data["Home"] == "Charlotte Bobcats", "Charlotte Hornets", data["Home"]
+    )
+    data["Away"] = np.where(
+        data["Away"] == "Charlotte Bobcats", "Charlotte Hornets", data["Away"]
+    )
+    data["Home"] = np.where(
+        data["Home"] == "Seattle SuperSonics", "Oklahoma City Thunder", data["Home"]
+    )
+    data["Away"] = np.where(
+        data["Away"] == "Seattle SuperSonics", "Oklahoma City Thunder", data["Away"]
+    )
+
+    return data
+
+
+def initial_odds_stats(data: pd.DataFrame):
+    """
+    Builds and commits initial odds stats table
+    """
     final_arr = []
-
-    #  Loads data, removes some games marked PK/NL (No Favorite)
-    df = df.drop(df.index[:11500])
-    mask = (df["H_ML"] != "NL") & (df["Spread"] != "PK")
-    df = df.loc[mask].reset_index(drop=True)
-
-    #  Sets up dataframe by converting column types
-    #  Adds Fav/UD Status Columns
-    #  Adds O/U and Spread Outcome Columns
-    #  Renames some team names for consistency
-    df["H_ML"] = df["H_ML"].replace(",", "").astype(float)
-    df["A_ML"] = df["A_ML"].replace(",", "").astype(float)
-    df["Spread"] = df["Spread"].astype(float)
-    df["H_Status"] = np.where(df["H_ML"] < 0, "Fav", "UD")
-    df["A_Status"] = np.where(df["A_ML"] < 0, "Fav", "UD")
-    df["O/U_Outcome"] = np.where(df["Points"] > df["O/U"], "Over", "Under")
-    df["Spread_Outcome"] = np.where(df["MOV"] > df["Spread"], 1, 0)
-    df["Home"] = np.where(df["Home"] == "New Jersey Nets", "Brooklyn Nets", df["Home"])
-    df["Away"] = np.where(df["Away"] == "New Jersey Nets", "Brooklyn Nets", df["Away"])
-    df["Home"] = np.where(
-        df["Home"] == "Charlotte Bobcats", "Charlotte Hornets", df["Home"]
-    )
-    df["Away"] = np.where(
-        df["Away"] == "Charlotte Bobcats", "Charlotte Hornets", df["Away"]
-    )
-    df["Home"] = np.where(
-        df["Home"] == "Seattle SuperSonics", "Oklahoma City Thunder", df["Home"]
-    )
-    df["Away"] = np.where(
-        df["Away"] == "Seattle SuperSonics", "Oklahoma City Thunder", df["Away"]
-    )
-    team_list = df["Home"].unique()
+    team_list = data["Home"].unique()
 
     for team in team_list:
         arr = []
 
         #  Team filters and datasets
-        h_team_mask = df["Home"] == team
-        a_team_mask = df["Away"] == team
-        h_games = df.loc[h_team_mask].reset_index(drop=True)
-        a_games = df.loc[a_team_mask].reset_index(drop=True)
+        h_games = data.loc[data["Home"] == team].reset_index(drop=True)
+        a_games = data.loc[data["Away"] == team].reset_index(drop=True)
 
         #  COUNT OF GAMES PLAYED FOR EACH CATEGORY
         fav_count = sum(h_games["H_Status"] == "Fav") + sum(
@@ -200,12 +213,12 @@ def initial_odds_stats(df):
         ],
     )
 
-    final_data = round(final_data,3)
+    final_data = round(final_data, 3)
     final_data.to_sql("odds_stats", utils.engine, if_exists="replace", index=False)
 
 
 @utils.timerun
-def clean_train():
+def clean_train() -> None:
     """
     Cleans the raw scraped file for training the model
     Adds Massey/Elo Ratings to Raw Data
@@ -224,7 +237,10 @@ def clean_train():
     data.to_csv("Train_Ready.csv", index=None)
 
 
-def set_extras(data):
+def set_extras(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds Season ID and MOV columns
+    """
     for i in data.index:
         start_year = str(data.at[i, "Date"]).split("-")[0]
         start_month = str(data.at[i, "Date"]).split("-")[1]
@@ -242,6 +258,9 @@ def set_extras(data):
 
 
 def combine_dailies():
+    """
+    Combines daily team stat and massey rating updates
+    """
     massey = pd.read_sql_table("current_massey", utils.engine)
     team = pd.read_sql_table("team_stats", utils.engine)
     massey.sort_values("Name", ascending=True, inplace=True)
@@ -293,5 +312,7 @@ def combine_dailies():
 if __name__ == "__main__":
     # combine_datasets()
     # clean_train()
-    data = combine_odds_dataset()
-    initial_odds_stats(data)
+
+    raw_data = combine_odds_dataset()
+    full_data = clean_odds_data(raw_data)
+    initial_odds_stats(full_data)

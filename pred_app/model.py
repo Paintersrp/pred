@@ -1,14 +1,6 @@
 """
 Docstring
 """
-import matplotlib.pyplot as plt
-import xgboost as xgb
-import pandas as pd
-import numpy as np
-import utils
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from xgboost.sklearn import XGBClassifier
 from sklearn.metrics import (
     precision_score,
     accuracy_score,
@@ -18,6 +10,15 @@ from sklearn.metrics import (
     recall_score,
     precision_recall_curve,
 )
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from xgboost.sklearn import XGBClassifier
+import matplotlib.pyplot as plt
+import xgboost as xgb
+import pandas as pd
+import numpy as np
+import utils
+
 
 FILE_NAME = "xgb_model.sav"
 DEF_CLASSIFIER = XGBClassifier(num_class=2)
@@ -32,32 +33,32 @@ PARAMS = {
     "num_class": 2,
 }
 
-EPOCHS = 25
+EPOCHS = 5000
 
 
 @utils.timerun
 def build_model(
-    data: pd.DataFrame, outcome: pd.Series, cv_count: int = 5
-) -> tuple[list, xgb.Booster, list, list, list, list]:
+    training_data: pd.DataFrame, target: pd.Series, cv_count: int = 5
+) -> tuple[list, list, list, list, list]:
     """
     Builds/trains a model with crossfold validation
     Saves newly trained model and returns scoring metrics
     """
-    metrics = []
+    metrics_list = []
 
     for i in range(cv_count):
         arr = []
         outcomes = []
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            data, outcome, test_size=0.15
+        x_train, x_test, y_train, y_test = train_test_split(
+            training_data, target, test_size=0.15
         )
 
-        X = xgb.DMatrix(X_train, label=y_train)
-        y = xgb.DMatrix(X_test, label=y_test)
+        x_matrix = xgb.DMatrix(x_train, label=y_train)
+        y_matrix = xgb.DMatrix(x_test, label=y_test)
 
-        xgb_model = xgb.train(PARAMS, X, EPOCHS)
-        preds = xgb_model.predict(y)
+        xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
+        preds = xgb_model.predict(y_matrix)
 
         for pred in preds:
             outcomes.append(np.argmax(pred))
@@ -76,26 +77,27 @@ def build_model(
         arr.extend(
             [precision, recall, accuracy, logloss, roc, correct, incorrect, game_count]
         )
-        metrics.append(arr)
+        metrics_list.append(arr)
 
         print(f"      {i+1} of {cv_count} Complete     ")
-        print(
-            f"{int(crosstab[0][0]) + int(crosstab[1][1])} Correct - {int(crosstab[0][1]) + int(crosstab[1][0])} Incorrect"
-        )
+        print(f"{correct} Correct - {incorrect} Incorrect")
         print(f"Precision: {round(precision,4)}%")
         print(f"Accuracy:  {round(accuracy,4)}%")
         print(f"Logloss:   {round(logloss,4)}%")
         print("-----------------------------")
 
-    return metrics, xgb_model, X_train, y_train, y_test, outcomes
+    return metrics_list, x_train, y_train, y_test, outcomes
 
 
 @utils.timerun
-def build_metric_table(metrics: list) -> None:
+def build_metric_table(metrics_data: list) -> pd.DataFrame:
+    """
+    Builds table of scoring metrics and commits to database
+    """
     full_data = []
 
-    metric_table = pd.DataFrame(
-        metrics,
+    table = pd.DataFrame(
+        metrics_data,
         columns=[
             "Precision",
             "Recall",
@@ -107,33 +109,33 @@ def build_metric_table(metrics: list) -> None:
             "Games Tested",
         ],
     )
-    prec_mean = metric_table["Precision"].agg(np.mean)
-    acc_mean = metric_table["Accuracy"].agg(np.mean)
-    log_mean = metric_table["Logloss"].agg(np.mean)
+    prec_mean = table["Precision"].agg(np.mean)
+    acc_mean = table["Accuracy"].agg(np.mean)
+    log_mean = table["Logloss"].agg(np.mean)
 
-    print(f"      Score Averages     ")
+    print("      Score Averages     ")
     print(f"Precision: {round(prec_mean,2)}%")
     print(f"Accuracy:  {round(acc_mean,2)}%")
     print(f"Logloss:   {round(log_mean,2)}%")
     print("-----------------------------")
 
-    for column in metric_table:
+    for column in table:
         temp = []
         temp.extend(
             [
-                metric_table[column].agg(np.mean),
-                metric_table[column].agg(np.min),
-                metric_table[column].agg(np.max),
-                metric_table[column].agg(np.std),
+                table[column].agg(np.mean),
+                table[column].agg(np.min),
+                table[column].agg(np.max),
+                table[column].agg(np.std),
             ]
         )
         full_data.append(temp)
 
-    metric_table = pd.DataFrame(
-        full_data, columns=["Mean", "Min", "Max", "Std"], index=metric_table.columns
+    table = pd.DataFrame(
+        full_data, columns=["Mean", "Min", "Max", "Std"], index=table.columns
     )
 
-    metric_table["Metric"] = [
+    table["Metric"] = [
         "Precision",
         "Recall",
         "Accuracy",
@@ -143,34 +145,35 @@ def build_metric_table(metrics: list) -> None:
         "Incorrect",
         "Games Tested",
     ]
-    metric_table = metric_table[["Metric", "Mean", "Min", "Max", "Std"]]
-    metric_table.to_sql(
-        "metric_scores", utils.engine, if_exists="replace", index=metric_table.columns
+    table = table[["Metric", "Mean", "Min", "Max", "Std"]]
+    table.to_sql(
+        "metric_scores", utils.engine, if_exists="replace", index=table.columns
     )
 
-    print(metric_table)
+    return table
 
 
 @utils.timerun
-def feature_scoring(X: list, y: list) -> None:
+def feature_scoring(x_train: list, y_train: list) -> pd.DataFrame:
     """
     Test Feature Importances and returns DataFrame of Scores
     """
     best = SelectKBest(score_func=f_classif, k="all")
-    fit = best.fit(X, y)
+    fit = best.fit(x_train, y_train)
 
     temp = pd.DataFrame(fit.scores_)
-    columns = pd.DataFrame(X.columns)
+    columns = pd.DataFrame(x_train.columns)
 
     scores = pd.concat([temp, columns], axis=1)
     scores.columns = ["Specs", "Score"]
     scores = scores.sort_values(["Specs"], ascending=False).reset_index(drop=True)
     scores.to_sql("feature_scores", utils.engine, if_exists="replace", index=False)
-    print(scores)
+
+    return scores
 
 
 @utils.timerun
-def hyperparameter_tuning(X: list, y: list):
+def hyperparameter_tuning(x_train: list, y_train: list) -> None:
     """
     Tests hyperparameters based on a narrow grid of options randomly to find the best combinations
     Prints breakdown of hyperparameter scoring
@@ -189,7 +192,7 @@ def hyperparameter_tuning(X: list, y: list):
         n_iter=48,
     )
 
-    rs_model.fit(X, y)
+    rs_model.fit(x_train, y_train)
     result = pd.DataFrame(rs_model.cv_results_)[parameters]
     result = result.sort_values(by=["mean_test_score"], ascending=False)
 
@@ -208,8 +211,11 @@ def hyperparameter_tuning(X: list, y: list):
 
 
 @utils.timerun
-def plot_roc_curve(y_test: list, preds: list):
-    fpr, tpr, empty = roc_curve(y_test, preds)
+def plot_roc_curve(y_test: list, preds: list) -> None:
+    """
+    Plots and saves a ROC-AUC plot image
+    """
+    fpr, tpr, dummy = roc_curve(y_test, preds)
     plt.plot(fpr, tpr, lw=2, color="royalblue", marker=".", label="PRED")
     plt.plot([0, 1], [0, 1], "--", color="firebrick", label="Baseline")
     plt.xlim([0, 1])
@@ -223,17 +229,20 @@ def plot_roc_curve(y_test: list, preds: list):
 
 
 @utils.timerun
-def plot_precision_recall(y_test: list, preds: list):
-    precision, recall, empty = precision_recall_curve(y_test, preds)
+def plot_precision_recall(y_test: list, preds: list) -> None:
+    """
+    Plots and saves a Precision-Recall plot image
+    """
+    precision, recall, dummy = precision_recall_curve(y_test, preds)
 
-    fig, ax = plt.subplots()
-    ax.plot(recall, precision, color="royalblue", label="PRED")
-    ax.plot([0, 1], [0.01, 0.01], color="firebrick", linestyle="--", label="Baseline")
+    _, axis = plt.subplots()
+    axis.plot(recall, precision, color="royalblue", label="PRED")
+    axis.plot([0, 1], [0.01, 0.01], color="firebrick", linestyle="--", label="Baseline")
     plt.xlim([0, 1])
     plt.ylim([0, 1])
-    ax.set_title("Precision-Recall Curve")
-    ax.set_ylabel("Precision")
-    ax.set_xlabel("Recall")
+    axis.set_title("Precision-Recall Curve")
+    axis.set_ylabel("Precision")
+    axis.set_xlabel("Recall")
     plt.legend(loc="best")
     plt.gcf().savefig("Precision_Recall_Curve.png", dpi=1200)
 
@@ -245,6 +254,9 @@ def find_trees(
     cv_folds: int = 5,
     early_stopping_rounds: int = 50,
 ) -> int:
+    """
+    Finds the ideal number of trees for the model
+    """
 
     xgb_model = XGBClassifier(
         learning_rate=0.01,
@@ -261,11 +273,11 @@ def find_trees(
     )
 
     xgb_param = xgb_model.get_xgb_params()
-    X = xgb.DMatrix(train, label=target)
+    x_matrix = xgb.DMatrix(train, label=target)
 
     cv_result = xgb.cv(
         xgb_param,
-        X,
+        x_matrix,
         num_boost_round=xgb_model.get_params()["n_estimators"],
         nfold=cv_folds,
         metrics="auc",
@@ -301,12 +313,15 @@ if __name__ == "__main__":
         ]
     ]
 
-    metrics, xgb_model, X, y, y_test, outcomes = build_model(data, outcome)
-    build_metric_table(metrics)
-    # hyperparameter_tuning(X, y)
-    feature_scoring(X, y)
-    plot_roc_curve(y_test, outcomes)
-    plot_precision_recall(y_test, outcomes)
-    trees = find_trees(data, outcome)
+    metrics, training, testing, actuals, predictions = build_model(data, outcome)
+    metric_table = build_metric_table(metrics)
+    scores_table = feature_scoring(training, testing)
+    plot_roc_curve(actuals, predictions)
+    plot_precision_recall(actuals, predictions)
 
-    print(trees)
+    print(metric_table)
+    print(scores_table)
+
+    # hyperparameter_tuning(X, y)
+    # trees = find_trees(data, outcome)
+    # print(trees)

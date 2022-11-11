@@ -1,8 +1,19 @@
+"""
+Docstring
+"""
 import time
 import functools
 from sqlalchemy import create_engine
 
 engine = create_engine("sqlite:///pred.db")
+
+SCH_HEADER = {
+    "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
+    "Chrome/57.0.2987.133 Safari/537.36",
+    "Accept-Language": "en",
+    "origin": "http://stats.nba.com",
+    "Referer": "https://google.com",
+}
 
 months_reg = [
     "october",
@@ -167,13 +178,71 @@ conf_dict = {
     "Portland Trail Blazers": "West",
 }
 
+#  Anything further in years than 1976 will need tweaking.
+months_map = {
+    1976: months_reg,
+    1977: months_reg,
+    1978: months_reg,
+    1979: months_reg,
+    1980: months_reg,
+    1981: months_reg,
+    1982: months_reg,
+    1983: months_reg,
+    1984: months_reg,
+    1985: months_reg,
+    1986: months_reg,
+    1987: months_reg,
+    1988: months_no_oct,
+    1989: months_no_oct,
+    1990: months_no_oct,
+    1991: months_no_oct,
+    1992: months_no_oct,
+    1993: months_no_oct,
+    1994: months_no_oct,
+    1995: months_no_oct,
+    1996: months_no_oct,
+    1997: months_no_oct,
+    1998: months_reg,
+    1999: months_1999,
+    2000: months_no_oct,
+    2001: months_reg,
+    2002: months_reg,
+    2003: months_reg,
+    2004: months_reg,
+    2005: months_no_oct,
+    2006: months_no_oct,
+    2007: months_reg,
+    2008: months_reg,
+    2009: months_reg,
+    2010: months_reg,
+    2011: months_reg,
+    2012: months_2012,
+    2013: months_reg,
+    2014: months_reg,
+    2015: months_reg,
+    2016: months_reg,
+    2017: months_reg,
+    2018: months_reg,
+    2019: months_reg,
+    2020: months_2020,
+    2021: months_2021,
+    2022: months_reg,
+    2023: months_reg
+}
+
+
+
 def timerun(function):
+    """
+    Simple Function Timing Wrapper
+    """
+
     @functools.wraps(function)
     def wrapper(*args, **kwargs):
-        t1 = time.perf_counter()
+        time_1 = time.perf_counter()
         result = function(*args, **kwargs)
-        t2 = time.perf_counter()
-        total = t2 - t1
+        time_2 = time.perf_counter()
+        total = time_2 - time_1
         print(
             f"Function {function.__name__} Took: {total:.4f} seconds ({total/60:.4f} minutes)"
         )
@@ -184,6 +253,7 @@ def timerun(function):
     # data3["Record"] = data3[["W", "L"]].apply(
     #   lambda row: "-".join(row.values.astype(str)), axis=1
     # )
+
 
 if __name__ == "__main__":
     pass

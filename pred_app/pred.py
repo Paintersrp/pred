@@ -1,13 +1,18 @@
+"""
+Docstring
+"""
+from datetime import date
+import typing as t
+import sys
+import xgboost as xgb
+import pandas as pd
+import numpy as np
+import requests
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from model import build_model
 from ratings import current_massey
 from scrape import collect_specific
 from transform import combine_dailies
-from datetime import date
-import xgboost as xgb
-import pandas as pd
-import numpy as np
-import requests
 import utils
 
 SCH_HEADER = {
@@ -34,7 +39,10 @@ PARAMS = {
 EPOCHS = 500
 
 
-def update_team_stats():
+def update_team_stats() -> t.Any:
+    """
+    Funcstring
+    """
     basic_stats = ldts.LeagueDashTeamStats(
         per_mode_detailed="Per100Possessions", season="2022-23"
     ).league_dash_team_stats.get_data_frame()
@@ -86,35 +94,33 @@ def update_team_stats():
     return team_stats
 
 
-def games_today(url, team_stats):
+def games_today(
+    url: str, team_stats: t.Any
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """
     Scrapes the NBA's schedule JSON for today's games
     Updates the most recent Team Stats and Massey Ratings
     Returns team names and test_data for DMatrix
     """
 
-    req = requests.get(url, headers=SCH_HEADER)
+    req = requests.get(url, headers=SCH_HEADER, timeout=60)
     data = req.json().get("gs").get("g")
 
     if not data:
         print("No games scheduled today.")
-        exit()
+        sys.exit()
 
     full_arrays = []
     ratings_array = []
 
-    df = collect_specific(2023, utils.months_reg)
-    massey_ratings = current_massey(df, "2022-23")
+    temp = collect_specific(2023, utils.months_reg)
+    massey_ratings = current_massey(temp, "2022-23")
 
     for matchup in data:
         massey = []
         game_date = matchup.get("gcode").split("/")[0]
         game_date = "-".join([game_date[:4], game_date[4:6], game_date[6:]])
-
-        if not "Qtr" in matchup.get("stt"):
-            game_time = matchup.get("stt")
-        else:
-            game_time = "Started"
+        game_time = matchup.get("stt")
 
         home_line = matchup.get("h")
         away_line = matchup.get("v")
@@ -138,15 +144,11 @@ def games_today(url, team_stats):
         game = np.concatenate((away_stats, home_stats), axis=0)
         full_arrays.append(game)
 
-        #  REMOVE VS STATS #######################################################################
-
         massey.extend(
             [
                 game_date,
                 round(float(away_massey), 2),
                 round(float(home_massey), 2),
-                f"{float(away_massey):.2f} vs. {float(home_massey):.2f}",
-                f"{float(away_stats.W_PCT)} vs. {float(home_stats.W_PCT)}",
                 game_time,
             ]
         )
@@ -161,7 +163,7 @@ def games_today(url, team_stats):
 
     rating_data = pd.DataFrame(
         ratings_array,
-        columns=["Date", "A_Massey", "H_Massey", "Rating Vs", "Win Vs", "Game Time"],
+        columns=["Date", "A_Massey", "H_Massey", "Game Time"],
     )
 
     game_data = pd.concat([game_data, rating_data], axis=1, join="outer")
@@ -179,19 +181,18 @@ def games_today(url, team_stats):
             "H_W_PCT",
             "A_Net",
             "H_Net",
-            "Rating Vs",
-            "Win Vs",
             "Game Time",
         ]
     ]
 
     game_data = game_data[features + ["A_Massey", "H_Massey"]]
-    combine_dailies()
 
     return game_data, game_placeholder, team_data
 
 
-def pred(test_data, ph, team_data):
+def daily_pred(
+    test_data: pd.DataFrame, outcomes: pd.Series, team_data: pd.DataFrame
+) -> pd.DataFrame:
     """
     Train/Score Model
     Prints teams and their respective odds for each of today's games
@@ -247,20 +248,20 @@ def pred(test_data, ph, team_data):
     # train_data = train_data[
     #     train_data.columns.drop(
     #         list(
-    #             train_data.filter(
-    #                 regex=r"(_RANK|_E_|_PACE|_ELO|_DEF|_OFF|_PFD|_PF|_POSS|_MIN|_W|_L|_PLUS|_GP|_REB)"
-    #             )
+    #            train_data.filter(
+    #             regex=r"(_RANK|_E_|_PACE|_ELO|_DEF|_OFF|_PFD|_PF|_POSS|_MIN|_W|_L|_PLUS|_GP|_REB)"
+    #            )
     #         )
     #     )
     # ]
 
-    xgb_model = build_model(train_data, outcome, True, 10)
+    xgb_model = build_model(train_data, outcome, 10)
 
-    X = xgb.DMatrix(train_data, label=outcome)
-    y = xgb.DMatrix(test_data[train_data.columns], label=ph)
+    x_matrix = xgb.DMatrix(train_data, label=outcome)
+    y_matrix = xgb.DMatrix(test_data[train_data.columns], label=outcomes)
 
-    xgb_model = xgb.train(PARAMS, X, EPOCHS)
-    preds = xgb_model.predict(y)
+    xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
+    preds = xgb_model.predict(y_matrix)
 
     for pred in preds:
         full_preds.append(
@@ -332,6 +333,7 @@ if __name__ == "__main__":
 
     warnings.filterwarnings("ignore")
 
-    team_stats = update_team_stats()
-    todays_games, ph, team_names = games_today(URL, team_stats)
-    final = pred(todays_games, ph, team_names)
+    daily_team_stats = update_team_stats()
+    todays_games, ph, team_names = games_today(URL, daily_team_stats)
+    combine_dailies()
+    final = daily_pred(todays_games, ph, team_names)

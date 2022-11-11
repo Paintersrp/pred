@@ -1,14 +1,19 @@
+"""
+Docstring
+"""
 from flask import Blueprint, render_template, request, flash
-from nba_api.stats.endpoints import leaguedashteamstats as ldts
-from website import views
-from .views import engine
 import pandas as pd
+from .views import engine
 
 auth = Blueprint("auth", __name__)
 
+
 @auth.route("/odds", methods=["GET", "POST"])
 def odds():
-    odds_stats = pd.read_sql_table('odds_stats', engine)
+    """
+    Odds Funcstring
+    """
+    odds_stats = pd.read_sql_table("odds_stats", engine)
     odds_stats.index = odds_stats.index + 1
     odds_stats.rename(columns={"Team": "Team Name"}, inplace=True)
 
@@ -23,9 +28,13 @@ def odds():
         headers=[""],
     )
 
+
 @auth.route("/stats", methods=["GET", "POST"])
 def league():
-    all_stats = pd.read_sql_table('all_stats', engine)
+    """
+    League Funcstring
+    """
+    all_stats = pd.read_sql_table("all_stats", engine)
     all_stats.index = all_stats.index + 1
     all_stats.rename(columns={"Team": "Team Name"}, inplace=True)
 
@@ -40,12 +49,16 @@ def league():
         headers=[""],
     )
 
+
 @auth.route("/stats/west", methods=["GET", "POST"])
 def west():
-    all_stats = pd.read_sql_table('all_stats', engine)
+    """
+    West Funcstring
+    """
+    all_stats = pd.read_sql_table("all_stats", engine)
     all_stats.rename(columns={"Team": "Team Name"}, inplace=True)
 
-    mask = (all_stats['Conf'] == 'West')
+    mask = all_stats["Conf"] == "West"
     west_stats = all_stats.loc[mask].reset_index(drop=True)
     west_stats.index = west_stats.index + 1
 
@@ -60,12 +73,16 @@ def west():
         headers=[""],
     )
 
+
 @auth.route("/stats/east", methods=["GET", "POST"])
 def east():
-    all_stats = pd.read_sql_table('all_stats', engine)
+    """
+    East Funcstring
+    """
+    all_stats = pd.read_sql_table("all_stats", engine)
     all_stats.rename(columns={"Team": "Team Name"}, inplace=True)
 
-    mask = (all_stats['Conf'] == 'East')
+    mask = all_stats["Conf"] == "East"
     east_stats = all_stats.loc[mask].reset_index(drop=True)
     east_stats.index = east_stats.index + 1
 
@@ -82,12 +99,18 @@ def east():
 
 
 @auth.route("/compare")
-def logout():
+def compare():
+    """
+    Compare Funcstring
+    """
     return render_template("rankings.html")
 
 
 @auth.route("/teams", methods=["GET", "POST"])
-def signup():
+def teams():
+    """
+    Teams Funcstring
+    """
     if request.method == "POST":
         email = request.form.get("email")
         first = request.form.get("firstName")
@@ -112,6 +135,6 @@ def signup():
     return render_template("sign_up.html")
 
 
-@auth.route("/about")
-def about():
-    return views.home_page()
+# @auth.route("/about")
+# def about():
+#     return views.home_page()
