@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 import pandas as pd
 import numpy as np
-import pickle
 import utils
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from xgboost.sklearn import XGBClassifier
 from sklearn.metrics import (
     precision_score,
     accuracy_score,
@@ -16,9 +18,6 @@ from sklearn.metrics import (
     recall_score,
     precision_recall_curve,
 )
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from xgboost.sklearn import XGBClassifier
 
 FILE_NAME = "xgb_model.sav"
 DEF_CLASSIFIER = XGBClassifier(num_class=2)
