@@ -1,15 +1,27 @@
-from sklearn.metrics import precision_score, accuracy_score, log_loss, roc_auc_score, roc_curve, recall_score, precision_recall_curve
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from xgboost.sklearn import XGBClassifier
+"""
+Docstring
+"""
 import matplotlib.pyplot as plt
 import xgboost as xgb
 import pandas as pd
 import numpy as np
 import pickle
 import utils
+from sklearn.metrics import (
+    precision_score,
+    accuracy_score,
+    log_loss,
+    roc_auc_score,
+    roc_curve,
+    recall_score,
+    precision_recall_curve,
+)
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from xgboost.sklearn import XGBClassifier
 
 FILE_NAME = "xgb_model.sav"
+DEF_CLASSIFIER = XGBClassifier(num_class=2)
 
 PARAMS = {
     "max_depth": 4,
@@ -21,17 +33,18 @@ PARAMS = {
     "num_class": 2,
 }
 
-EPOCHS = 5000
+EPOCHS = 25
 
 
 @utils.timerun
-def build_model(data, outcome, feat_scoring=False, cv_count = 5):
+def build_model(
+    data: pd.DataFrame, outcome: pd.Series, cv_count: int = 5
+) -> tuple[list, xgb.Booster, list, list, list, list]:
     """
     Builds/trains a model with crossfold validation
     Saves newly trained model and returns scoring metrics
     """
-    metric_arr = []
-    full_array = []
+    metrics = []
 
     for i in range(cv_count):
         arr = []
@@ -64,17 +77,26 @@ def build_model(data, outcome, feat_scoring=False, cv_count = 5):
         arr.extend(
             [precision, recall, accuracy, logloss, roc, correct, incorrect, game_count]
         )
-        metric_arr.append(arr)
+        metrics.append(arr)
 
         print(f"      {i+1} of {cv_count} Complete     ")
-        print(f"{int(crosstab[0][0]) + int(crosstab[1][1])} Correct - {int(crosstab[0][1]) + int(crosstab[1][0])} Incorrect")
+        print(
+            f"{int(crosstab[0][0]) + int(crosstab[1][1])} Correct - {int(crosstab[0][1]) + int(crosstab[1][0])} Incorrect"
+        )
         print(f"Precision: {round(precision,4)}%")
         print(f"Accuracy:  {round(accuracy,4)}%")
         print(f"Logloss:   {round(logloss,4)}%")
         print("-----------------------------")
 
+    return metrics, xgb_model, X_train, y_train, y_test, outcomes
+
+
+@utils.timerun
+def build_metric_table(metrics: list) -> None:
+    full_data = []
+
     metric_table = pd.DataFrame(
-        metric_arr,
+        metrics,
         columns=[
             "Precision",
             "Recall",
@@ -106,21 +128,11 @@ def build_model(data, outcome, feat_scoring=False, cv_count = 5):
                 metric_table[column].agg(np.std),
             ]
         )
-        full_array.append(temp)
+        full_data.append(temp)
 
     metric_table = pd.DataFrame(
-        full_array, columns=["Mean", "Min", "Max", "Std"], index=metric_table.columns
+        full_data, columns=["Mean", "Min", "Max", "Std"], index=metric_table.columns
     )
-    print(metric_table)
-
-    X = xgb.DMatrix(data, label=outcome)
-    xgb_model = xgb.train(PARAMS, X, EPOCHS)
-
-    pickle.dump(xgb_model, open(FILE_NAME, "wb"))
-
-    if feat_scoring == True:
-        scores = feature_scoring(X_train, y_train)
-        scores.to_sql("feature_scores", utils.engine, if_exists="replace", index=False)
 
     metric_table["Metric"] = [
         "Precision",
@@ -136,13 +148,12 @@ def build_model(data, outcome, feat_scoring=False, cv_count = 5):
     metric_table.to_sql(
         "metric_scores", utils.engine, if_exists="replace", index=metric_table.columns
     )
-    plot_roc_curve(y_test, outcomes)
-    plot_precision_recall(y_test, outcomes)
 
-    return xgb_model, X_train, y_train
+    print(metric_table)
 
 
-def feature_scoring(X, y):
+@utils.timerun
+def feature_scoring(X: list, y: list) -> None:
     """
     Test Feature Importances and returns DataFrame of Scores
     """
@@ -155,13 +166,12 @@ def feature_scoring(X, y):
     scores = pd.concat([temp, columns], axis=1)
     scores.columns = ["Specs", "Score"]
     scores = scores.sort_values(["Specs"], ascending=False).reset_index(drop=True)
+    scores.to_sql("feature_scores", utils.engine, if_exists="replace", index=False)
     print(scores)
-
-    return scores
 
 
 @utils.timerun
-def hyperparameter_tuning(X, y, prints=False):
+def hyperparameter_tuning(X: list, y: list):
     """
     Tests hyperparameters based on a narrow grid of options randomly to find the best combinations
     Prints breakdown of hyperparameter scoring
@@ -169,10 +179,9 @@ def hyperparameter_tuning(X, y, prints=False):
     parameters = ["param_" + params for params in utils.xgb_narrow_grid] + [
         "mean_test_score"
     ]
-    xgb_model = xgb.XGBClassifier(num_class=2)
 
     rs_model = RandomizedSearchCV(
-        estimator=xgb_model,
+        estimator=DEF_CLASSIFIER,
         param_distributions=utils.xgb_narrow_grid,
         cv=3,
         verbose=10,
@@ -185,41 +194,23 @@ def hyperparameter_tuning(X, y, prints=False):
     result = pd.DataFrame(rs_model.cv_results_)[parameters]
     result = result.sort_values(by=["mean_test_score"], ascending=False)
 
-    for key, items in utils.xgb_narrow_grid.items():
-        i = 0
-
-        for item in items:
-            count = result.loc[result[f"param_{key}"] == item].count()[i]
-            mean = result.loc[result[f"param_{key}"] == item]
-            mean = mean["mean_test_score"].mean()
-
-            if prints == True:
-                print(f"{key}: {item}")
-                print(f"Count: {count}")
-                print(f"Mean: {round(mean,6)} \n")
-
-        i += 1
-
     parameters.remove("mean_test_score")
 
     for parameter in parameters:
         temp1 = result.groupby(parameter)["mean_test_score"].agg(np.mean).reset_index()
         temp1 = temp1.sort_values(by=["mean_test_score"], ascending=False)
+        print("\n", temp1)
 
-        if prints == True:
-            print("\n", temp1)
-
-    if prints == True:
-        print(f"Best score: {rs_model.best_score_}")
-        print(f"Best params: {rs_model.best_params_}")
-        print(f"Best estimator: {rs_model.best_estimator_}")
+    print(f"Best score: {rs_model.best_score_}")
+    print(f"Best params: {rs_model.best_params_}")
+    print(f"Best estimator: {rs_model.best_estimator_}")
 
     result.to_sql("hyper_scores", utils.engine, if_exists="replace", index=False)
-    # result.to_csv('HyperMeanScores.csv')
 
 
-def plot_roc_curve(y_test, preds):
-    fpr, tpr, temp = roc_curve(y_test, preds)
+@utils.timerun
+def plot_roc_curve(y_test: list, preds: list):
+    fpr, tpr, empty = roc_curve(y_test, preds)
     plt.plot(fpr, tpr, lw=2, color="royalblue", marker=".", label="PRED")
     plt.plot([0, 1], [0, 1], "--", color="firebrick", label="Baseline")
     plt.xlim([0, 1])
@@ -232,8 +223,9 @@ def plot_roc_curve(y_test, preds):
     plt.clf()
 
 
-def plot_precision_recall(y_test, preds):
-    precision, recall, th = precision_recall_curve(y_test, preds)
+@utils.timerun
+def plot_precision_recall(y_test: list, preds: list):
+    precision, recall, empty = precision_recall_curve(y_test, preds)
 
     fig, ax = plt.subplots()
     ax.plot(recall, precision, color="royalblue", label="PRED")
@@ -249,78 +241,73 @@ def plot_precision_recall(y_test, preds):
 
 @utils.timerun
 def find_trees(
-    classifier, train, features, target, cv_folds=5, early_stopping_rounds=50
-):
-    xgb_param = classifier.get_xgb_params()
-    xgtrain = xgb.DMatrix(train[features], label=target)
+    train: pd.DataFrame,
+    target: pd.Series,
+    cv_folds: int = 5,
+    early_stopping_rounds: int = 50,
+) -> int:
 
-    cvresult = xgb.cv(
+    xgb_model = XGBClassifier(
+        learning_rate=0.01,
+        n_estimators=5000,
+        max_depth=4,
+        min_child_weight=60,
+        gamma=0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective="multi:softmax",
+        nthread=4,
+        num_class=2,
+        seed=27,
+    )
+
+    xgb_param = xgb_model.get_xgb_params()
+    X = xgb.DMatrix(train, label=target)
+
+    cv_result = xgb.cv(
         xgb_param,
-        xgtrain,
-        num_boost_round=classifier.get_params()["n_estimators"],
+        X,
+        num_boost_round=xgb_model.get_params()["n_estimators"],
         nfold=cv_folds,
         metrics="auc",
         early_stopping_rounds=early_stopping_rounds,
     )
 
-    print(cvresult.shape[0])
+    trees = cv_result.shape[0]
+
+    return trees
 
 
 if __name__ == "__main__":
     data = pd.read_csv("Train_Ready.csv")
     mask = data["A_Massey"] != 0
     data = data.loc[mask].reset_index(drop=True)
-
     outcome = data["Outcome"]
+    # data = data[data.columns.drop(list(data.filter(regex="_RANK")))]
 
-    data.drop(
+    data = data[
         [
-            "Outcome",
-            "Date",
-            "Home",
-            "Away",
-            "MOV",
-            "A_W",
-            "H_W",
-            "A_L",
-            "H_L",
-            "A_W_PCT",
-            "H_W_PCT",
-            "A_PLUS_MINUS",
-            "H_PLUS_MINUS",
-        ],
-        axis=1,
-        inplace=True,
-    )
-    data = data[data.columns.drop(list(data.filter(regex="_RANK")))]
+            "A_Massey",
+            "H_Massey",
+            "H_NET_RATING",
+            "A_NET_RATING",
+            "A_PIE",
+            "H_PIE",
+            "A_TS_PCT",
+            "H_TS_PCT",
+            "A_FGM",
+            "H_FGM",
+            "A_DREB",
+            "H_DREB",
+        ]
+    ]
 
-    # data = data[['A_Massey',
-    #              'H_Massey',
-    #               'H_NET_RATING',
-    #               'A_NET_RATING',
-    #               'A_PIE',
-    #               'H_PIE',
-    #               'A_TS_PCT',
-    #               'H_TS_PCT',
-    #               'A_FGM',
-    #               'H_FGM',
-    #               'A_DREB',
-    #               'H_DREB']]
+    metrics, xgb_model, X, y, y_test, outcomes = build_model(data, outcome)
+    build_metric_table(metrics)
+    # hyperparameter_tuning(X, y)
+    feature_scoring(X, y)
+    plot_roc_curve(y_test, outcomes)
+    plot_precision_recall(y_test, outcomes)
+    trees = find_trees(data, outcome)
 
-    xgb_model, X, y = build_model(data, outcome, True)
-    # hyperparameter_tuning(X, y, prints = True)
-
-    # xgb1 = XGBClassifier(
-    #     learning_rate =0.01,
-    #     n_estimators=5000,
-    #     max_depth=4,
-    #     min_child_weight=60,
-    #     gamma=0,
-    #     subsample=0.8,
-    #     colsample_bytree=0.8,
-    #     objective= 'multi:softmax',
-    #     nthread=4,
-    #     num_class=2,
-    #     seed=27)
-
-    # find_trees(xgb1, data, features, outcome)
+    print(trees)
