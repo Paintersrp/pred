@@ -1,5 +1,5 @@
 """
-Docstring
+This script contains data cleaning/transforming/amending functions
 """
 import pandas as pd
 import numpy as np
@@ -9,7 +9,7 @@ from ratings import add_massey, add_elo
 
 def combine_datasets() -> None:
     """
-    Combines seasons of training data into one
+    Combines hard-copy seasons of training data into one
     """
     sets = (
         pd.read_csv("TrainDataRawAdv_2005-09.csv"),
@@ -20,12 +20,12 @@ def combine_datasets() -> None:
 
     final = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
     final.drop(final[["A_TEAM_NAME", "H_TEAM_NAME"]], axis=1, inplace=True)
-    final.to_csv("Train.csv")
+    final.to_sql("raw_data", utils.ENGINE, if_exists="replace", index=False)
 
 
 def combine_odds_dataset() -> pd.DataFrame:
     """
-    Combines seasons of odds data into one
+    Combines hard-copy seasons of odds data into one
     """
     sets = (
         pd.read_excel("2007-08.xlsx"),
@@ -62,7 +62,8 @@ def combine_odds_dataset() -> pd.DataFrame:
 def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds some new columns to the data for analysis
-    Makes some data adjustments to keep things consistent
+    Makes some naming adjustments to keep things consistent
+    Currently only using the last three seasons of odds data
     """
 
     data = data.drop(data.index[:11500])
@@ -101,7 +102,51 @@ def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
 
 def initial_odds_stats(data: pd.DataFrame):
     """
-    Builds and commits initial odds stats table
+    Purpose
+    ----------
+    Builds odds stats table
+
+    Notable variables:
+        fav_count:
+            Numbers of games as the favorite
+
+        ud_count:
+            Number of games as the underdog
+
+        fav_rate:
+            Number of games as favorite (fav_count) / total games (game_count)
+
+        ud_rate:
+            Number of games as underdog (ud_count) / total games (game_count)
+
+        fav_win:
+            Percentage of games a team won as favorite (fav wins / fav_count)
+
+        ud_win:
+            Percentage of games won as underdog (ud wins / ud_count)
+
+        cover_pct:
+            Percentage of games where the Vegas spread is covered
+
+        over_pct:
+            Percentage of games where the Vegas point estimate is over
+
+        under_pct:
+            Percentage of games where the Vegas point estimate is under
+
+        upset_def_opps:
+            Number of games where a team is the heavy favorite (>80%)
+        
+        upset_def_win_pct:
+            Number of heavy favorite games won / number of opportunities (upset_def_opps)
+
+        upset_off_opps:
+            Number of games where a team is the heavy underdog (<20%)
+        
+        upset_off_win_pct:
+            Number of heavy underdog games won / number of opportunities (upset_off_opps)   
+    
+    Commits initial odds stats table to database
     """
     final_arr = []
     team_list = data["Home"].unique()
@@ -214,7 +259,7 @@ def initial_odds_stats(data: pd.DataFrame):
     )
 
     final_data = round(final_data, 3)
-    final_data.to_sql("odds_stats", utils.engine, if_exists="replace", index=False)
+    final_data.to_sql("odds_stats", utils.ENGINE, if_exists="replace", index=False)
 
 
 @utils.timerun
@@ -224,23 +269,32 @@ def clean_train() -> None:
     Adds Massey/Elo Ratings to Raw Data
     """
 
-    data = pd.read_csv("Train.csv")
+    data = pd.read_sql_table("raw_data", utils.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
     data["Outcome"] = np.where(data["H-Pts"] > data["A-Pts"], 1, 0)
 
     data.drop(
-        ["Unnamed: 0", "Time", "A-Pts", "H-Pts", "OT", "SeasonID"], axis=1, inplace=True
+        ["Time", "A-Pts", "H-Pts", "OT"], axis=1, inplace=True
     )
 
     data = add_massey(data)
-    data = add_elo(data)
-    data.to_csv("Train_Ready.csv", index=None)
+    #data = add_elo(data)
+    data.to_sql("training_data", utils.ENGINE, if_exists="replace", index=False)
 
+def commit_sch():
+    """
+    Commits hard copy full schedule file to database
+    """
+    data = pd.read_csv("FullGamesFinal.csv")
+    data = set_extras(data)
+    data.to_sql("full_sch", utils.ENGINE, if_exists="replace", index=False)
 
 def set_extras(data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Season ID and MOV columns
     """
+    data["Date"] = pd.to_datetime(data["Date"])
+
     for i in data.index:
         start_year = str(data.at[i, "Date"]).split("-")[0]
         start_month = str(data.at[i, "Date"]).split("-")[1]
@@ -261,8 +315,8 @@ def combine_dailies():
     """
     Combines daily team stat and massey rating updates
     """
-    massey = pd.read_sql_table("current_massey", utils.engine)
-    team = pd.read_sql_table("team_stats", utils.engine)
+    massey = pd.read_sql_table("current_massey", utils.ENGINE)
+    team = pd.read_sql_table("team_stats", utils.ENGINE)
     massey.sort_values("Name", ascending=True, inplace=True)
     massey.reset_index(drop=True, inplace=True)
 
@@ -282,9 +336,9 @@ def combine_dailies():
             "TOV",
             "OREB",
             "DREB",
-            "Off",
-            "Def",
-            "Net",
+            "OFF_RATING",
+            "DEF_RATING",
+            "NET_RATING",
             "PIE",
             "FG_PCT",
             "FG3_PCT",
@@ -295,9 +349,9 @@ def combine_dailies():
     combined = combined.rename(
         columns={
             "TS_PCT": "TS%",
-            "Off": "OFF",
-            "Def": "DEF",
-            "Net": "NET",
+            "OFF_RATING": "OFF",
+            "DEF_RATING": "DEF",
+            "NET_RATING": "NET",
             "OREB": "ORB",
             "DREB": "DRB",
             "FG_PCT": "FG%",
@@ -306,13 +360,16 @@ def combine_dailies():
     )
 
     combined["Massey"] = round(combined["Massey"], 2)
-    combined.to_sql("all_stats", utils.engine, if_exists="replace", index=False)
+    combined.to_sql("all_stats", utils.ENGINE, if_exists="replace", index=False)
 
 
 if __name__ == "__main__":
     # combine_datasets()
     # clean_train()
 
-    raw_data = combine_odds_dataset()
-    full_data = clean_odds_data(raw_data)
-    initial_odds_stats(full_data)
+    data = pd.read_sql_table("prediction_history", utils.ENGINE)
+    print(data)
+
+    # raw_data = combine_odds_dataset()
+    # full_data = clean_odds_data(raw_data)
+    # initial_odds_stats(full_data)

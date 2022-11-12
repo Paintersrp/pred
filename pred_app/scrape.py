@@ -1,5 +1,6 @@
 """
-Docstring
+Outside of the collect specific function nothing in this script needs to be reused
+All data has already been collected, copies can be found in the /backups folder
 """
 from datetime import date
 import time
@@ -62,7 +63,7 @@ def collect_specific(year: int, months: list[str]) -> pd.DataFrame:
     data["OT"] = data["OT"].str.replace("Unnamed: 7", "")
     data["Date"] = pd.to_datetime(data["Date"])
     data = set_extras(data)
-    data.to_sql(f"{year}_Game_Schedule", utils.engine, if_exists="replace", index=False)
+    data.to_sql(f"{year}_Game_Schedule", utils.ENGINE, if_exists="replace", index=False)
 
     return data
 
@@ -71,7 +72,7 @@ def map_months(year: int) -> list:
     """
     Returns season's months list for given year
     """
-    return utils.months_map.get(year, utils.months_reg)
+    return utils.months_map.get(year, utils.MONTHS_REG)
 
 
 def collect_range(start_year: int, end_year: int) -> None:
@@ -93,6 +94,8 @@ def collect_range(start_year: int, end_year: int) -> None:
             table = soup.find(
                 name="table", attrs={"class": "suppress_glossary sortable stats_table"}
             )
+
+
 
             if not table is None:
                 body = table.find("tbody")
@@ -199,7 +202,7 @@ def get_boxscore_data(data: pd.DataFrame = pd.read_csv("FullGamesFinal.csv")) ->
 
 
 @utils.timerun
-def final_team_data(data: pd.DataFrame = pd.read_csv("FullGamesFinal.csv")) -> None:
+def final_team_data(data: pd.DataFrame = pd.read_sql_table("full_sch", utils.ENGINE)) -> None:
     """
     Retrieves team averages data for every game in a dataset using nba_api
     """
@@ -317,5 +320,6 @@ if __name__ == "__main__":
     # set_extras()
     # final_team_data()
 
-    test = collect_specific(2023, utils.months_reg)
-    print(test)
+    # test = collect_specific(2023, utils.months_reg)
+    # print(test)
+    pass

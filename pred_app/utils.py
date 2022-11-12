@@ -5,7 +5,7 @@ import time
 import functools
 from sqlalchemy import create_engine
 
-engine = create_engine("sqlite:///pred.db")
+ENGINE = create_engine("sqlite:///pred.db")
 
 SCH_HEADER = {
     "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
@@ -15,33 +15,15 @@ SCH_HEADER = {
     "Referer": "https://google.com",
 }
 
-months_reg = [
-    "october",
-    "november",
-    "december",
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-]
 
-months_no_oct = [
-    "november",
-    "december",
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-]
+"""
+Seasons vary in months played throughout the years
+The below section contains various month lists and a year:months dictionary for mapping
+"""
+MONTHS_1999 = ["february", "march", "april", "may", "june"]
+MONTHS_2012 = ["december", "january", "february", "march", "april", "may", "june"]
 
-months_1999 = ["february", "march", "april", "may", "june"]
-months_2012 = ["december", "january", "february", "march", "april", "may", "june"]
-
-months_2020 = [
+MONTHS_2020 = [
     "october-2019",
     "november",
     "december",
@@ -54,7 +36,7 @@ months_2020 = [
     "october-2020",
 ]
 
-months_2021 = [
+MONTHS_2021 = [
     "december",
     "january",
     "february",
@@ -65,28 +47,88 @@ months_2021 = [
     "july",
 ]
 
-xgb_param_grid = {
-    "eta": [0.3, 0.4, 0.5, 0.6],
-    "max_depth": [1, 2, 3, 5, 7, 9, 13],
-    "min_child_weight": [0.5, 1.0, 3.0, 5.0, 7.0, 10.0, 15],
-    "gamma": [0.0],
-    "colsample_bytree": [1.0],
-    "n_estimators": [50, 300, 500, 1000],
-    "subsample": [0.6, 0.8, 1.0],
-    "objective": ["multi:softmax"],
+MONTHS_REG = [
+    "october",
+    "november",
+    "december",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+]
+
+MONTHS_NO_OCT = [
+    "november",
+    "december",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+]
+
+#  Anything further in years than 1976 will need tweaking.
+months_map = {
+    1976: MONTHS_REG,
+    1977: MONTHS_REG,
+    1978: MONTHS_REG,
+    1979: MONTHS_REG,
+    1980: MONTHS_REG,
+    1981: MONTHS_REG,
+    1982: MONTHS_REG,
+    1983: MONTHS_REG,
+    1984: MONTHS_REG,
+    1985: MONTHS_REG,
+    1986: MONTHS_REG,
+    1987: MONTHS_REG,
+    1988: MONTHS_NO_OCT,
+    1989: MONTHS_NO_OCT,
+    1990: MONTHS_NO_OCT,
+    1991: MONTHS_NO_OCT,
+    1992: MONTHS_NO_OCT,
+    1993: MONTHS_NO_OCT,
+    1994: MONTHS_NO_OCT,
+    1995: MONTHS_NO_OCT,
+    1996: MONTHS_NO_OCT,
+    1997: MONTHS_NO_OCT,
+    1998: MONTHS_REG,
+    1999: MONTHS_1999,
+    2000: MONTHS_NO_OCT,
+    2001: MONTHS_REG,
+    2002: MONTHS_REG,
+    2003: MONTHS_REG,
+    2004: MONTHS_REG,
+    2005: MONTHS_NO_OCT,
+    2006: MONTHS_NO_OCT,
+    2007: MONTHS_REG,
+    2008: MONTHS_REG,
+    2009: MONTHS_REG,
+    2010: MONTHS_REG,
+    2011: MONTHS_REG,
+    2012: MONTHS_2012,
+    2013: MONTHS_REG,
+    2014: MONTHS_REG,
+    2015: MONTHS_REG,
+    2016: MONTHS_REG,
+    2017: MONTHS_REG,
+    2018: MONTHS_REG,
+    2019: MONTHS_REG,
+    2020: MONTHS_2020,
+    2021: MONTHS_2021,
+    2022: MONTHS_REG,
+    2023: MONTHS_REG
 }
 
-xgb_narrow_grid = {
-    "eta": [0.1],
-    "max_depth": [4, 5, 6],
-    "min_child_weight": [5, 15, 60],
-    "gamma": [0.0, 0.5],
-    "colsample_bytree": [0.8, 1.0],
-    "n_estimators": [385],
-    "subsample": [0.8, 1.0],
-    "objective": ["multi:softmax"],
-}
 
+"""
+The below section contains dicts for:
+    month   :   month code
+    team    :   team abbreviation
+    team    :   conference
+"""
 month_dict = {
     "Jan": "01",
     "Feb": "02",
@@ -178,59 +220,89 @@ conf_dict = {
     "Portland Trail Blazers": "West",
 }
 
-#  Anything further in years than 1976 will need tweaking.
-months_map = {
-    1976: months_reg,
-    1977: months_reg,
-    1978: months_reg,
-    1979: months_reg,
-    1980: months_reg,
-    1981: months_reg,
-    1982: months_reg,
-    1983: months_reg,
-    1984: months_reg,
-    1985: months_reg,
-    1986: months_reg,
-    1987: months_reg,
-    1988: months_no_oct,
-    1989: months_no_oct,
-    1990: months_no_oct,
-    1991: months_no_oct,
-    1992: months_no_oct,
-    1993: months_no_oct,
-    1994: months_no_oct,
-    1995: months_no_oct,
-    1996: months_no_oct,
-    1997: months_no_oct,
-    1998: months_reg,
-    1999: months_1999,
-    2000: months_no_oct,
-    2001: months_reg,
-    2002: months_reg,
-    2003: months_reg,
-    2004: months_reg,
-    2005: months_no_oct,
-    2006: months_no_oct,
-    2007: months_reg,
-    2008: months_reg,
-    2009: months_reg,
-    2010: months_reg,
-    2011: months_reg,
-    2012: months_2012,
-    2013: months_reg,
-    2014: months_reg,
-    2015: months_reg,
-    2016: months_reg,
-    2017: months_reg,
-    2018: months_reg,
-    2019: months_reg,
-    2020: months_2020,
-    2021: months_2021,
-    2022: months_reg,
-    2023: months_reg
+"""
+List of various feature sets used for model
+"""
+NET_FULL = [
+    "W_PCT",
+    "FGM",
+    "FGA",
+    "FG_PCT",
+    "FG3M",
+    "FG3A",
+    "FG3_PCT",
+    "FTM",
+    "FTA",
+    "FT_PCT",
+    "OREB",
+    "DREB",
+    "REB",
+    "AST",
+    "TOV",
+    "STL",
+    "BLK",
+    "BLKA",
+    "PF",
+    "PFD",
+    "PTS",
+    "OFF_RATING",
+    "DEF_RATING",
+    "NET_RATING",
+    "AST_PCT",
+    "AST_TO",
+    "AST_RATIO",
+    "OREB_PCT",
+    "DREB_PCT",
+    "REB_PCT",
+    "TM_TOV_PCT",
+    "EFG_PCT",
+    "TS_PCT",
+    "PACE",
+    "POSS",
+    "PIE",
+]
+
+TRUNC = ['FTA', 'FTM']
+NET_TRUNC = [item for item in NET_FULL if item not in TRUNC]
+
+NET_FULL_FEATURES = ["A_" + item for item in NET_FULL] + [
+    "H_" + item for item in NET_FULL
+]
+NET_TRUNC_FEATURES = ["A_" + item for item in NET_TRUNC] + [
+    "H_" + item for item in NET_TRUNC
+]
+
+MASSEY_FULL_FEATURES = ["A_" + item for item in NET_FULL + ["Massey"]] + [
+    "H_" + item for item in NET_FULL + ["Massey"]
+]
+MASSEY_TRUNC_FEATURES = ["A_" + item for item in NET_TRUNC + ["Massey"]] + [
+    "H_" + item for item in NET_TRUNC + ["Massey"]
+]
+
+"""
+The below section contains parameter grids for testing hyperparameters
+"""
+xgb_param_grid = {
+    "eta": [0.3, 0.4, 0.5, 0.6],
+    "max_depth": [1, 2, 3, 5, 7, 9, 13],
+    "min_child_weight": [0.5, 1.0, 3.0, 5.0, 7.0, 10.0, 15],
+    "gamma": [0.0],
+    "colsample_bytree": [1.0],
+    "n_estimators": [580],
+    "subsample": [0.6, 0.8, 1.0],
+    "objective": ["multi:softmax"],
 }
 
-
+xgb_narrow_grid = {
+    "eta": [0.01],
+    "max_depth": [3],
+    "min_child_weight": [5, 90, 150],
+    "gamma": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "colsample_bytree": [1.0],
+    "n_estimators": [580],
+    "subsample": [0.8],
+    "objective": ["multi:softmax"],
+}
 
 def timerun(function):
     """

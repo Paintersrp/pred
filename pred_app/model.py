@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 import pandas as pd
 import numpy as np
+import pickle
 import utils
 
 
@@ -24,8 +25,8 @@ FILE_NAME = "xgb_model.sav"
 DEF_CLASSIFIER = XGBClassifier(num_class=2)
 
 PARAMS = {
-    "max_depth": 4,
-    "min_child_weight": 60,
+    "max_depth": 3,
+    "min_child_weight": 5,
     "eta": 0.01,
     "colsample_bytree": 0.8,
     "subsample": 0.8,
@@ -33,12 +34,59 @@ PARAMS = {
     "num_class": 2,
 }
 
-EPOCHS = 5000
-
+EPOCHS = 918
 
 @utils.timerun
-def build_model(
-    training_data: pd.DataFrame, target: pd.Series, cv_count: int = 5
+def predict_season(season: str):
+    """
+    Funcstring
+    """
+    outcomes = []
+
+    train_data = pd.read_sql_table("training_data", utils.ENGINE)
+    mask = train_data["A_Massey"] != 0
+    train_data = train_data.loc[mask].reset_index(drop=True)
+
+    season_mask = train_data["SeasonID"] == season
+    x_train = train_data.drop(train_data[season_mask].index, axis=0)
+    x_test = train_data[season_mask]
+    y_train = x_train["Outcome"]
+    y_test = x_test["Outcome"]
+
+    x_train = x_train[utils.NET_FULL_FEATURES]
+    x_test = x_test[utils.NET_FULL_FEATURES]
+
+    x_matrix = xgb.DMatrix(x_train, label=y_train)
+    y_matrix = xgb.DMatrix(x_test, label=y_test)   
+
+    xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
+    preds = xgb_model.predict(y_matrix)
+
+    for pred in preds:
+        outcomes.append(np.argmax(pred))
+
+    combined = pd.DataFrame(dict(actual=y_test, prediction=outcomes))
+    crosstab = pd.crosstab(index=combined["actual"], columns=combined["prediction"])
+
+    precision = round(precision_score(y_test, outcomes), 4) * 100
+    accuracy = round(accuracy_score(y_test, outcomes), 4) * 100
+    logloss = round(log_loss(y_test, outcomes), 4)
+    correct = int(crosstab[0][0]) + int(crosstab[1][1])
+    incorrect = int(crosstab[0][1]) + int(crosstab[1][0])
+
+    print(f"{correct} Correct - {incorrect} Incorrect")
+    print(f"Precision: {round(precision,4)}%")
+    print(f"Accuracy:  {round(accuracy,4)}%")
+    print(f"Logloss:   {round(logloss,4)}%")
+    print("-----------------------------")
+
+@utils.timerun
+def test_model(
+    training_data: pd.DataFrame,
+    target: pd.Series,
+    cv_count: int = 5,
+    epochs: int = 918,
+    params: dict = PARAMS,
 ) -> tuple[list, list, list, list, list]:
     """
     Builds/trains a model with crossfold validation
@@ -57,12 +105,14 @@ def build_model(
         x_matrix = xgb.DMatrix(x_train, label=y_train)
         y_matrix = xgb.DMatrix(x_test, label=y_test)
 
-        xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
+        xgb_model = xgb.train(params, x_matrix, epochs)
         preds = xgb_model.predict(y_matrix)
 
         for pred in preds:
             outcomes.append(np.argmax(pred))
 
+
+        # break this into a scoring function/metric function####################################################################
         combined = pd.DataFrame(dict(actual=y_test, prediction=outcomes))
         crosstab = pd.crosstab(index=combined["actual"], columns=combined["prediction"])
 
@@ -86,11 +136,13 @@ def build_model(
         print(f"Logloss:   {round(logloss,4)}%")
         print("-----------------------------")
 
-    return metrics_list, x_train, y_train, y_test, outcomes
+    build_metric_table(metrics_list, True)
+
+    return x_train, y_train, y_test, outcomes
 
 
 @utils.timerun
-def build_metric_table(metrics_data: list) -> pd.DataFrame:
+def build_metric_table(metrics_data: list, testing: bool = True) -> pd.DataFrame:
     """
     Builds table of scoring metrics and commits to database
     """
@@ -146,15 +198,32 @@ def build_metric_table(metrics_data: list) -> pd.DataFrame:
         "Games Tested",
     ]
     table = table[["Metric", "Mean", "Min", "Max", "Std"]]
-    table.to_sql(
-        "metric_scores", utils.engine, if_exists="replace", index=table.columns
-    )
+
+    if testing == False:
+        table.to_sql(
+            "metric_scores", utils.ENGINE, if_exists="replace", index=table.columns
+        )
+    
+    print(table)
 
     return table
 
+def save_model(model: xgb.Booster) -> None:
+    """
+    Saves trained model
+    """
+    pickle.dump(model, open("model.pkl", "wb"))
+
+def load_model() -> xgb.Booster:
+    """
+    Loads trained model
+    """
+    model = pickle.load(open("model.pkl", "rb"))
+
+    return model
 
 @utils.timerun
-def feature_scoring(x_train: list, y_train: list) -> pd.DataFrame:
+def feature_scoring(x_train: list, y_train: list, testing: bool = True) -> pd.DataFrame:
     """
     Test Feature Importances and returns DataFrame of Scores
     """
@@ -167,13 +236,15 @@ def feature_scoring(x_train: list, y_train: list) -> pd.DataFrame:
     scores = pd.concat([temp, columns], axis=1)
     scores.columns = ["Specs", "Score"]
     scores = scores.sort_values(["Specs"], ascending=False).reset_index(drop=True)
-    scores.to_sql("feature_scores", utils.engine, if_exists="replace", index=False)
+
+    if testing == False:
+        scores.to_sql("feature_scores", utils.ENGINE, if_exists="replace", index=False)
 
     return scores
 
 
 @utils.timerun
-def hyperparameter_tuning(x_train: list, y_train: list) -> None:
+def hyperparameter_tuning(x_train: list, y_train: list, testing: bool = True) -> None:
     """
     Tests hyperparameters based on a narrow grid of options randomly to find the best combinations
     Prints breakdown of hyperparameter scoring
@@ -189,7 +260,7 @@ def hyperparameter_tuning(x_train: list, y_train: list) -> None:
         verbose=10,
         n_jobs=-1,
         return_train_score=False,
-        n_iter=48,
+        n_iter=128,
     )
 
     rs_model.fit(x_train, y_train)
@@ -207,7 +278,8 @@ def hyperparameter_tuning(x_train: list, y_train: list) -> None:
     print(f"Best params: {rs_model.best_params_}")
     print(f"Best estimator: {rs_model.best_estimator_}")
 
-    result.to_sql("hyper_scores", utils.engine, if_exists="replace", index=False)
+    if testing == False:
+        result.to_sql("hyper_scores", utils.ENGINE, if_exists="replace", index=False)
 
 
 @utils.timerun
@@ -253,16 +325,17 @@ def find_trees(
     target: pd.Series,
     cv_folds: int = 5,
     early_stopping_rounds: int = 50,
+    learning_rate: float = 0.01
 ) -> int:
     """
     Finds the ideal number of trees for the model
     """
 
     xgb_model = XGBClassifier(
-        learning_rate=0.01,
-        n_estimators=5000,
-        max_depth=4,
-        min_child_weight=60,
+        learning_rate=learning_rate,
+        n_estimators=10000,
+        max_depth=3,
+        min_child_weight=5,
         gamma=0,
         subsample=0.8,
         colsample_bytree=0.8,
@@ -290,38 +363,21 @@ def find_trees(
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("Train_Ready.csv")
-    mask = data["A_Massey"] != 0
-    data = data.loc[mask].reset_index(drop=True)
-    outcome = data["Outcome"]
-    # data = data[data.columns.drop(list(data.filter(regex="_RANK")))]
+    # data = pd.read_sql_table("training_data", utils.ENGINE)
+    # mask = data["A_Massey"] != 0
+    # data = data.loc[mask].reset_index(drop=True)
+    # outcome = data["Outcome"]
 
-    data = data[
-        [
-            "A_Massey",
-            "H_Massey",
-            "H_NET_RATING",
-            "A_NET_RATING",
-            "A_PIE",
-            "H_PIE",
-            "A_TS_PCT",
-            "H_TS_PCT",
-            "A_FGM",
-            "H_FGM",
-            "A_DREB",
-            "H_DREB",
-        ]
-    ]
+    # data = data[utils.NET_FULL_FEATURES]
 
-    metrics, training, testing, actuals, predictions = build_model(data, outcome)
-    metric_table = build_metric_table(metrics)
-    scores_table = feature_scoring(training, testing)
-    plot_roc_curve(actuals, predictions)
-    plot_precision_recall(actuals, predictions)
+    # training, testing, actuals, predictions = test_model(data, outcome)
+    # scores_table = feature_scoring(training, testing, False)
+    # print(scores_table)
+    # plot_roc_curve(actuals, predictions)
+    # plot_precision_recall(actuals, predictions)
 
-    print(metric_table)
-    print(scores_table)
+    predict_season("2019-20")
 
-    # hyperparameter_tuning(X, y)
+    # hyperparameter_tuning(training, testing, False)
     # trees = find_trees(data, outcome)
     # print(trees)

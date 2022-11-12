@@ -18,7 +18,7 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Elo to the file containing the full schedule (2008-2022)
     """
-    data = pd.read_csv("FullGamesFinal.csv")
+    data = pd.read_sql_table("full_sch", utils.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
     season = 0
@@ -178,7 +178,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     Concats Massey Ratings to provided file (usually schedule or raw stats)
     """
 
-    data = pd.read_csv("FullGamesFinal.csv")
+    data = pd.read_sql_table("full_sch", utils.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
     check_date = date.today()
@@ -191,7 +191,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
         for i in filtered_data.index:
             arr: list[float] = []
 
-            if j < 20:
+            if j < 55:
                 arr.extend([0, 0])
                 full_arrays.append(arr)
                 j += 1
@@ -234,7 +234,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
 
 def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
     """
-    Gets Massey Ratings for the current season up to the most recent played game
+    Gets Massey Ratings for the current season up to the most recently played game
     """
     check_date = date.today()
     full_arrays = []
@@ -292,7 +292,7 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
     cur_massey = cur_massey.sort_values("Massey", ascending=False).reset_index(
         drop=True
     )
-    cur_massey.to_sql("Current_Massey", utils.engine, if_exists="replace", index=False)
+    cur_massey.to_sql("Current_Massey", utils.ENGINE, if_exists="replace", index=False)
 
     massey_ratings = final.groupby("Name")
 
@@ -300,7 +300,7 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # data = pd.read_csv('FullGamesFinal.csv')
+    # data = pd.read_sql_table("full_sch", utils.ENGINE)
     # season_id = '2021-22'
     # game_date = '2022-05-01'
 
