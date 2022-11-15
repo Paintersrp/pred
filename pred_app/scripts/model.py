@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 import pandas as pd
 import numpy as np
-from scripts import utils
+from scripts import utils, const, dicts
 
 
 FILE_NAME = "xgb_model.sav"
@@ -214,7 +214,7 @@ def build_metric_table(metrics_data: list, testing: bool = True) -> pd.DataFrame
 
     if testing is False:
         table.to_sql(
-            "metric_scores", utils.ENGINE, if_exists="replace", index=table.columns
+            "metric_scores", const.ENGINE, if_exists="replace", index=table.columns
         )
 
     print(table)
@@ -254,7 +254,7 @@ def feature_scoring(x_train: list, y_train: list, testing: bool = True) -> pd.Da
     scores = scores.sort_values(["Specs"], ascending=False).reset_index(drop=True)
 
     if testing is False:
-        scores.to_sql("feature_scores", utils.ENGINE, if_exists="replace", index=False)
+        scores.to_sql("feature_scores", const.ENGINE, if_exists="replace", index=False)
 
     print(scores)
 
@@ -267,13 +267,13 @@ def hyperparameter_tuning(x_train: list, y_train: list, testing: bool = True) ->
     Tests hyperparameters based on a narrow grid of options randomly to find the best combinations
     Prints breakdown of hyperparameter scoring
     """
-    parameters = ["param_" + params for params in utils.xgb_narrow_grid] + [
+    parameters = ["param_" + params for params in dicts.xgb_narrow_grid] + [
         "mean_test_score"
     ]
 
     rs_model = RandomizedSearchCV(
         estimator=DEF_CLASSIFIER,
-        param_distributions=utils.xgb_narrow_grid,
+        param_distributions=dicts.xgb_narrow_grid,
         cv=3,
         verbose=10,
         n_jobs=-1,
@@ -297,7 +297,7 @@ def hyperparameter_tuning(x_train: list, y_train: list, testing: bool = True) ->
     print(f"Best estimator: {rs_model.best_estimator_}")
 
     if testing is False:
-        result.to_sql("hyper_scores", utils.ENGINE, if_exists="replace", index=False)
+        result.to_sql("hyper_scores", const.ENGINE, if_exists="replace", index=False)
 
 
 @utils.timerun
@@ -387,7 +387,7 @@ def predict_season(season: str) -> list:
     """
     outcomes = []
 
-    train_data = pd.read_sql_table("training_data", utils.ENGINE)
+    train_data = pd.read_sql_table("training_data", const.ENGINE)
     mask = train_data["A_Massey"] != 0
     train_data = train_data.loc[mask].reset_index(drop=True)
 
@@ -400,8 +400,8 @@ def predict_season(season: str) -> list:
     y_train_mov = x_train['MOV']
     y_test_mov = x_test['MOV']
 
-    x_train = x_train[utils.NET_FULL_FEATURES]
-    x_test = x_test[utils.NET_FULL_FEATURES]
+    x_train = x_train[const.NET_FULL_FEATURES]
+    x_test = x_test[const.NET_FULL_FEATURES]
 
     x_matrix = xgb.DMatrix(x_train, label=y_train_mov)
     y_matrix = xgb.DMatrix(x_test, label=y_test_mov)
@@ -424,11 +424,11 @@ def predict_season(season: str) -> list:
 
 
 if __name__ == "__main__":
-    # data = pd.read_sql_table("training_data", utils.ENGINE)
+    # data = pd.read_sql_table("training_data", const.ENGINE)
     # mask = data["A_Massey"] != 0
     # data = data.loc[mask].reset_index(drop=True)
     # outcome = data["Outcome"]
-    # data = data[utils.NET_FULL_FEATURES]
+    # data = data[const.NET_FULL_FEATURES]
 
     # training, testing, actuals, predictions = test_model(data, outcome)
     # scores_table = feature_scoring(training, testing, False)

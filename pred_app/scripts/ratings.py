@@ -6,7 +6,7 @@ import typing as t
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-from scripts import utils
+from scripts import utils, const, dicts
 
 MEAN_ELO = 1500
 ELO_WIDTH = 400
@@ -18,7 +18,7 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Elo to the file containing the full schedule (2008-2022)
     """
-    data = pd.read_sql_table("full_sch", utils.ENGINE)
+    data = pd.read_sql_table("full_sch", const.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
     season = 0
@@ -178,7 +178,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     Concats Massey Ratings to provided file (usually schedule or raw stats)
     """
 
-    data = pd.read_sql_table("full_sch", utils.ENGINE)
+    data = pd.read_sql_table("full_sch", const.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
     check_date = date.today()
@@ -189,7 +189,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
         filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
 
         for i in filtered_data.index:
-            arr: list[float] = []
+            arr = []
 
             if j < 55:
                 arr.extend([0, 0])
@@ -241,7 +241,7 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
     j = 0
 
     for i in data.index:
-        arr: list[float] = []
+        arr = []
 
         if j < 20:
             arr.extend([0, 0])
@@ -288,11 +288,11 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
     cur_massey = final.sort_index(axis=0, ascending=False)
     cur_massey = cur_massey.groupby("Name").head(1).reset_index(drop=True)
     cur_massey.drop(cur_massey.tail(1).index, inplace=True)
-    cur_massey["Conf"] = cur_massey["Name"].map(utils.conf_dict)
+    cur_massey["Conf"] = cur_massey["Name"].map(dicts.conf_dict)
     cur_massey = cur_massey.sort_values("Massey", ascending=False).reset_index(
         drop=True
     )
-    cur_massey.to_sql("Current_Massey", utils.ENGINE, if_exists="replace", index=False)
+    cur_massey.to_sql("Current_Massey", const.ENGINE, if_exists="replace", index=False)
 
     massey_ratings = final.groupby("Name")
 
@@ -300,7 +300,7 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # data = pd.read_sql_table("full_sch", utils.ENGINE)
+    # data = pd.read_sql_table("full_sch", const.ENGINE)
     # season_id = '2021-22'
     # game_date = '2022-05-01'
 

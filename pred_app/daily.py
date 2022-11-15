@@ -11,9 +11,9 @@ import requests
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts.model import test_model, feature_scoring
 from scripts.ratings import current_massey
-from scripts.scrape import collect_specific
+from scripts.scrape import collect_sch_by_year
 from scripts.transform import combine_dailies
-from scripts import utils
+from scripts import const, dict
 
 SCH_HEADER = {
     "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
@@ -83,11 +83,11 @@ def update_team_stats() -> t.Any:
     )
 
     team_stats = pd.concat([basic_stats, advanced_stats], axis=1, join="outer")
-    team_stats["Conf"] = team_stats["Team"].map(utils.conf_dict)
+    team_stats["Conf"] = team_stats["Team"].map(dict.conf_dict)
     team_stats["Record"] = team_stats[["W", "L"]].apply(
         lambda row: "-".join(row.values.astype(str)), axis=1
     )
-    team_stats.to_sql("team_stats", utils.ENGINE, if_exists="replace", index=False)
+    team_stats.to_sql("team_stats", const.ENGINE, if_exists="replace", index=False)
     team_stats = team_stats.groupby("Team")
 
     return team_stats
@@ -100,12 +100,12 @@ def update_massey():
     Calculates up-to-date Massey Ratings
     Returns Massey Ratings grouped by Team Name
     """
-    data = pd.read_sql_table("prediction_history_net", utils.ENGINE)
+    data = pd.read_sql_table("prediction_history_net", const.ENGINE)
 
     if data['Date'].unique()[0] != str(date.today()):
-        temp = collect_specific(2023)
+        temp = collect_sch_by_year(2023)
     else:
-        temp = pd.read_sql_table("2023_played_games", utils.ENGINE)
+        temp = pd.read_sql_table("2023_played_games", const.ENGINE)
 
     massey_ratings = current_massey(temp, "2022-23")
 
@@ -241,14 +241,9 @@ def daily_pred(
     Returns today's prediction table
     """
 
-    train_data = pd.read_sql_table("training_data", utils.ENGINE)
-    print(train_data)
-    mask = train_data["A_Massey"] != 0
-    train_data = train_data.loc[mask].reset_index(drop=True)
+    train_data = pd.read_sql_table("training_data", const.ENGINE)
     outcomes = train_data["Outcome"]
-
-    net_data = train_data[utils.NET_FULL_FEATURES]
-    massey_data = train_data[utils.MASSEY_FULL_FEATURES]
+    net_data = train_data[const.NET_FULL_FEATURES]
 
     training, testing, actuals, predictions = test_model(net_data, outcomes, 2, NET_EPOCHS)
     feature_scoring(training, testing, True)
@@ -257,12 +252,18 @@ def daily_pred(
     final_net = predict_today(
         net_data, outcomes, test_data, test_outcomes, team_data, NET_EPOCHS
     )
+
+    mask = train_data["A_Massey"] != 0
+    train_data = train_data.loc[mask].reset_index(drop=True)
+    outcomes = train_data["Outcome"]
+    massey_data = train_data[const.MASSEY_FULL_FEATURES]
+
     final_massey = predict_today(
         massey_data, outcomes, test_data, test_outcomes, team_data, MASSEY_EPOCHS
     )
 
-    commit_history(final_net, utils.NET_FULL_FEATURES)
-    commit_history(final_massey, utils.MASSEY_FULL_FEATURES)
+    commit_history(final_net, const.NET_FULL_FEATURES)
+    commit_history(final_massey, const.MASSEY_FULL_FEATURES)
 
     commit_preds(final_net)
 
@@ -343,8 +344,8 @@ def commit_history(data: pd.DataFrame, features: list) -> None:
     """
     pred_history_update = data[["Date", "A_Team", "A_Odds", "H_Team", "H_Odds"]]
 
-    if features == utils.NET_FULL_FEATURES:
-        old_pred_history = pd.read_sql_table("prediction_history_net", utils.ENGINE)
+    if features == const.NET_FULL_FEATURES:
+        old_pred_history = pd.read_sql_table("prediction_history_net", const.ENGINE)
 
         new_pred_history = pd.concat(
             [pred_history_update, old_pred_history], axis=0, join="outer"
@@ -355,11 +356,11 @@ def commit_history(data: pd.DataFrame, features: list) -> None:
         )
 
         new_pred_history.to_sql(
-            "prediction_history_net", utils.ENGINE, if_exists="replace", index=False
+            "prediction_history_net", const.ENGINE, if_exists="replace", index=False
         )
 
-    elif features == utils.MASSEY_FULL_FEATURES:
-        old_pred_history = pd.read_sql_table("prediction_history_massey", utils.ENGINE)
+    elif features == const.MASSEY_FULL_FEATURES:
+        old_pred_history = pd.read_sql_table("prediction_history_massey", const.ENGINE)
 
         new_pred_history = pd.concat(
             [pred_history_update, old_pred_history], axis=0, join="outer"
@@ -370,7 +371,7 @@ def commit_history(data: pd.DataFrame, features: list) -> None:
         )
 
         new_pred_history.to_sql(
-            "prediction_history_massey", utils.ENGINE, if_exists="replace", index=False
+            "prediction_history_massey", const.ENGINE, if_exists="replace", index=False
         )
 
 
@@ -413,7 +414,7 @@ def commit_preds(data: pd.DataFrame) -> None:
         ]
     ]
 
-    data.to_sql("today_preds", utils.ENGINE, if_exists="replace", index=False)
+    data.to_sql("today_preds", const.ENGINE, if_exists="replace", index=False)
     print(data)
 
 

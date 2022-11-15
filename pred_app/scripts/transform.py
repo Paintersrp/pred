@@ -4,13 +4,15 @@ This script contains data cleaning/transforming/amending functions
 import pandas as pd
 import numpy as np
 from datetime import date
-from scripts import utils
+from scripts import utils, const
 from scripts.ratings import add_massey, add_elo
 
 
 def combine_datasets() -> None:
     """
     Combines hard-copy seasons of training data into one
+    ---------
+    Included in the backups folder, or can be scraped.
     """
     sets = (
         pd.read_csv("TrainDataRawAdv_2005-09.csv"),
@@ -21,28 +23,31 @@ def combine_datasets() -> None:
 
     final = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
     final.drop(final[["A_TEAM_NAME", "H_TEAM_NAME"]], axis=1, inplace=True)
-    final.to_sql("raw_data", utils.ENGINE, if_exists="replace", index=False)
+    final.to_sql("raw_data", const.ENGINE, if_exists="replace", index=False)
 
 
 def combine_odds_dataset() -> pd.DataFrame:
     """
     Combines hard-copy seasons of odds data into one
+    ----------
+    Available at:
+    https://www.sportsbookreviewsonline.com/scoresoddsarchives/nba/nbaoddsarchives.htm
     """
     sets = (
-        pd.read_excel("2007-08.xlsx"),
-        pd.read_excel("2008-09.xlsx"),
-        pd.read_excel("2009-10.xlsx"),
-        pd.read_excel("2010-11.xlsx"),
-        pd.read_excel("2011-12.xlsx"),
-        pd.read_excel("2012-13.xlsx"),
-        pd.read_excel("2013-14.xlsx"),
-        pd.read_excel("2014-15.xlsx"),
-        pd.read_excel("2015-16.xlsx"),
-        pd.read_excel("2016-17.xlsx"),
-        pd.read_excel("2018-19.xlsx"),
-        pd.read_excel("2019-20.xlsx"),
-        pd.read_excel("2020-21.xlsx"),
-        pd.read_excel("2021-22.xlsx"),
+        pd.read_excel("nba odds 2007-08.xlsx"),
+        pd.read_excel("nba odds 2008-09.xlsx"),
+        pd.read_excel("nba odds 2010-11.xlsx"),
+        pd.read_excel("nba odds 2009-10.xlsx"),
+        pd.read_excel("nba odds 2011-12.xlsx"),
+        pd.read_excel("nba odds 2012-13.xlsx"),
+        pd.read_excel("nba odds 2013-14.xlsx"),
+        pd.read_excel("nba odds 2014-15.xlsx"),
+        pd.read_excel("nba odds 2015-16.xlsx"),
+        pd.read_excel("nba odds 2016-17.xlsx"),
+        pd.read_excel("nba odds 2018-19.xlsx"),
+        pd.read_excel("nba odds 2019-20.xlsx"),
+        pd.read_excel("nba odds 2020-21.xlsx"),
+        pd.read_excel("nba odds 2021-22.xlsx"),
     )
 
     data = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
@@ -101,7 +106,7 @@ def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def initial_odds_stats(data: pd.DataFrame):
+def initial_odds_stats(data: pd.DataFrame) -> None:
     #  pylint: disable=too-many-locals
     """
     Purpose
@@ -253,7 +258,7 @@ def initial_odds_stats(data: pd.DataFrame):
     )
 
     final_data = round(final_data, 3)
-    final_data.to_sql("odds_stats", utils.ENGINE, if_exists="replace", index=False)
+    final_data.to_sql("odds_stats", const.ENGINE, if_exists="replace", index=False)
 
 
 @utils.timerun
@@ -263,7 +268,7 @@ def clean_train() -> None:
     Adds Massey/Elo Ratings to Raw Data
     """
 
-    data = pd.read_sql_table("raw_data", utils.ENGINE)
+    data = pd.read_sql_table("raw_data", const.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
     data["Outcome"] = np.where(
         data["H-Pts"].astype(float) > data["A-Pts"].astype(float), 1, 0
@@ -273,7 +278,7 @@ def clean_train() -> None:
 
     data = add_massey(data)
     # data = add_elo(data)
-    data.to_sql("training_data", utils.ENGINE, if_exists="replace", index=False)
+    data.to_sql("training_data", const.ENGINE, if_exists="replace", index=False)
 
 
 def commit_sch():
@@ -282,7 +287,7 @@ def commit_sch():
     """
     data = pd.read_csv("FullGamesFinal.csv")
     data = set_extras(data)
-    data.to_sql("full_sch", utils.ENGINE, if_exists="replace", index=False)
+    data.to_sql("full_sch", const.ENGINE, if_exists="replace", index=False)
 
 
 def set_extras(data: pd.DataFrame) -> pd.DataFrame:
@@ -311,8 +316,8 @@ def combine_dailies():
     """
     Combines daily team stat and massey rating updates
     """
-    massey = pd.read_sql_table("current_massey", utils.ENGINE)
-    team = pd.read_sql_table("team_stats", utils.ENGINE)
+    massey = pd.read_sql_table("current_massey", const.ENGINE)
+    team = pd.read_sql_table("team_stats", const.ENGINE)
     massey.sort_values("Name", ascending=True, inplace=True)
     massey.reset_index(drop=True, inplace=True)
 
@@ -356,7 +361,7 @@ def combine_dailies():
     )
 
     combined["Massey"] = round(combined["Massey"], 2)
-    combined.to_sql("all_stats", utils.ENGINE, if_exists="replace", index=False)
+    combined.to_sql("all_stats", const.ENGINE, if_exists="replace", index=False)
 
 
 def update_history_outcomes() -> None:
@@ -366,10 +371,10 @@ def update_history_outcomes() -> None:
     Commits prediction scoring table to database
     """
     arr = []
-    predicted = pd.read_sql_table("prediction_history_net", utils.ENGINE)
+    predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
     predicted["Actual"] = "TBD"
 
-    played = pd.read_sql_table("2023_played_games", utils.ENGINE)
+    played = pd.read_sql_table("2023_played_games", const.ENGINE)
 
     pred_mask = predicted["Date"] != str(date.today())
     predicted = predicted.loc[pred_mask].reset_index(drop=True)
@@ -403,16 +408,15 @@ def update_history_outcomes() -> None:
 
         arr.append(filtered_predicted)
 
-    # filtered_predicted.to_sql(f"prediction_scoring", utils.ENGINE, if_exists="replace", index=False)
     arr = pd.concat(arr, axis=0, join="outer")
-    # arr.to_sql(f"prediction_scoring", utils.ENGINE, if_exists="replace", index=False)
+    # arr.to_sql(f"prediction_scoring", const.ENGINE, if_exists="replace", index=False)
     print(arr)
 
 
 def clean_box_data(data: pd.DataFrame) -> pd.DataFrame:
     data.columns = data.columns
     data = data.drop(data.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
-    data.columns = utils.BOX_FEATURES
+    data.columns = const.BOX_FEATURES
 
     return data
 

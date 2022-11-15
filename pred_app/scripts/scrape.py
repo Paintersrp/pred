@@ -8,20 +8,15 @@ import requests
 import sys
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from bs4 import BeautifulSoup
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scripts.transform import set_extras, clean_box_data
-from scripts import utils
+from scripts import utils, const, dicts
 
-
-@utils.timerun
-def collect_specific(year: int) -> pd.DataFrame:
-    """
-    Collects schedule data for specific year
-    """
+def scrape_sch(year: str, months: list) -> pd.DataFrame:
     arrays = []
-    months = map_months(year)
 
     for month in tqdm(months):
         time.sleep(3)
@@ -52,7 +47,29 @@ def collect_specific(year: int) -> pd.DataFrame:
 
             arrays.append(arr)
 
-    data = pd.DataFrame(list(map(np.ravel, arrays)))
+    return arrays
+
+def map_months(year: int) -> list:
+    """
+    Returns season's months list for given year
+    """
+    return dicts.months_map.get(year, const.MONTHS_REG)
+
+def map_season(year: int) -> list:
+    """
+    Returns season's months list for given year
+    """
+    return dicts.season_map[year]   
+
+@utils.timerun
+def collect_sch_by_year(year: int) -> pd.DataFrame:
+    """
+    Collects schedule data for specific year
+    """
+    months = map_months(year)
+    games = scrape_sch(year, months)
+
+    data = pd.DataFrame(list(map(np.ravel, games)))
 
     #  Game start times were not included on the schedule table until 2001
     if len(data.columns) == 10:
@@ -66,60 +83,35 @@ def collect_specific(year: int) -> pd.DataFrame:
 
     played = data[data["H-Pts"] != ""]
     played = set_extras(played)
-    played.to_sql(f"{year}_played_games", utils.ENGINE, if_exists="replace", index=False)
+    played.to_sql(
+        f"{year}_played_games", const.ENGINE, if_exists="replace", index=False
+    )
 
     upcoming = data[data["H-Pts"] == ""]
     upcoming.drop(upcoming.columns[[3, 5, 6]], axis=1, inplace=True)
-    upcoming.to_sql(f"{year}_upcoming_games", utils.ENGINE, if_exists="replace", index=False)    
+    upcoming.to_sql(
+        f"{year}_upcoming_games", const.ENGINE, if_exists="replace", index=False
+    )
 
     return played
 
 
-def map_months(year: int) -> list:
-    """
-    Returns season's months list for given year
-    """
-    return utils.months_map.get(year, utils.MONTHS_REG)
-
-
-def collect_range(start_year: int, end_year: int) -> None:
+def collect_sch_by_range(start_year: int, end_year: int) -> None:
     """
     Collects schedule data for specific range
     """
-    arrays = []
+    first = True
 
     for year in range(start_year, end_year + 1):
         months = map_months(year)
+        games = scrape_sch(year, months)
 
-        for month in months:
-            time.sleep(3)
-            url = f"https://www.basketball-reference.com/leagues/NBA_{year}_games-{month}.html"
-
-            page = requests.get(url, timeout=60)
-            soup = BeautifulSoup(page.text, "html.parser")
-
-            table = soup.find(
-                name="table", attrs={"class": "suppress_glossary sortable stats_table"}
-            )
-
-            if not table is None:
-                body = table.find("tbody")
-            else:
-                break
-
-            for row in body.find_all("tr", class_="thead"):
-                row.decompose()
-
-            rows = body.find_all("tr")
-
-            for table_row in rows:
-                row_date = table_row.find("th")
-                cells = table_row.find_all("td")
-                arr = [row_date.text] + [row.text for row in cells]
-
-                arrays.append(arr)
-
-    data = pd.DataFrame(list(map(np.ravel, arrays)))
+        if first:
+            data = pd.DataFrame(list(map(np.ravel, games)))
+            first = False
+        else:
+            temp = pd.DataFrame(list(map(np.ravel, games)))
+            data = pd.concat([data, temp], axis=0, join="outer")
 
     if len(data.columns) == 10:
         data.drop(data.columns[[5, 7, 8, 9]], axis=1, inplace=True)
@@ -128,12 +120,12 @@ def collect_range(start_year: int, end_year: int) -> None:
 
     data.columns = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT"]
     data["OT"] = data["OT"].str.replace("Unnamed: 7", "")
-    data.to_csv("FullGamesFinal.csv", index=None)
 
 
 @utils.timerun
 def get_boxscore_data(
-    data: pd.DataFrame = pd.read_csv("FullGamesFinal.csv"), date_time: bool = False,
+    data: pd.DataFrame,
+    from_csv: bool = False,
 ) -> pd.DataFrame:
     """
     Retrieves boxscore data for every game in a dataset
@@ -157,7 +149,7 @@ def get_boxscore_data(
         else:
             data.at[i, "Outcome"] = 0
 
-        if date_time:
+        if not from_csv:
             date_split = str(data.at[i, "Date"]).split(" ")
             date_split = date_split[0].split("-")
             month_num = date_split[1]
@@ -166,17 +158,19 @@ def get_boxscore_data(
 
         else:
             date_split = data.at[i, "Date"].split(" ")
-            month_num = utils.month_dict[date_split[1]]
+            month_num = dicts.month_dict[date_split[1]]
             year_num = date_split[3]
             day_num = date_split[2].replace(",", "")
 
             if 1 <= int(day_num) <= 9:
-                day_num = f"0{day_num}"  #  Add leading zero to digits under 10. (9 -> 09)
+                day_num = (
+                    f"0{day_num}"  #  Adds leading zero to digits under 10. (9 -> 09)
+                )
 
-        team_abr = utils.team_dict[data.at[i, "Home"]]
+        team_abr = dicts.team_dict[data.at[i, "Home"]]
         ot_check = data.at[i, "OT"]
 
-        url = f"https://www.basketball-reference.com/boxscores/{year_num}{month_num}{day_num}0{team_abr}.html" #  pylint: disable=line-too-long
+        url = f"https://www.basketball-reference.com/boxscores/{year_num}{month_num}{day_num}0{team_abr}.html"  #  pylint: disable=line-too-long
 
         time.sleep(3)
         page = requests.get(url, timeout=60)
@@ -212,14 +206,14 @@ def get_boxscore_data(
     averages = pd.DataFrame(list(map(np.ravel, final)))
 
     final = pd.concat([data, averages], axis=1, join="outer")
-    final.to_csv("BoxscoreData.csv", index=None)
+    final.to_csv("BoxscoreData_2016.csv", index=None)
 
     return final
 
 
 @utils.timerun
-def final_team_data(
-    data: pd.DataFrame = pd.read_sql_table("full_sch", utils.ENGINE)
+def collect_training_data(
+    data: pd.DataFrame = pd.read_sql_table("full_sch", const.ENGINE)
 ) -> None:
     """
     Retrieves team averages data for every game in a dataset using nba_api
@@ -331,15 +325,16 @@ def final_team_data(
     final = pd.concat([filtered, averages], axis=1, join="outer")
     final.to_csv("TrainDataRawAdv.csv", index=None)
 
+
 def update_boxscore_data() -> None:
     """
     Loads previous boxscore data and most recent list of played games
     Compares games in both, filtering to only what's not in the database
     Scrapes missing game data
     """
-    
-    box = pd.read_sql_table("boxscore_data", utils.ENGINE)
-    played = pd.read_sql_table("2023_played_games", utils.ENGINE)
+
+    box = pd.read_sql_table("boxscore_data", const.ENGINE)
+    played = pd.read_sql_table("2023_played_games", const.ENGINE)
     box["Date"] = pd.to_datetime(box["Date"]).dt.date
     played["Date"] = pd.to_datetime(played["Date"]).dt.date
 
@@ -368,7 +363,44 @@ def update_boxscore_data() -> None:
         new_box["H-Pts"].astype(float) > new_box["A-Pts"].astype(float), 1, 0
     )
 
-    new_box.to_sql("boxscore_data", utils.ENGINE, if_exists="replace", index=False)
+    new_box.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
+
+
+def collect_injuries() -> defaultdict(list):
+    """
+    Collects daily line up reports and enters them into dictionary
+    Returns dictionary of team lineup statuses
+    """
+    url = "https://www.rotowire.com/basketball/nba-lineups.php"
+
+    page = requests.get(url, timeout=60)
+    soup = BeautifulSoup(page.text, "html.parser")
+
+    team_names = soup.find_all(name="div", attrs={"class": "lineup__abbr"})
+
+    unordered_lists = soup.find_all(name="ul", attrs={"class": "lineup__list"})
+
+    injury_dict = defaultdict(list)
+
+    for i in range(len(unordered_lists)):
+        rows = unordered_lists[i].find_all("li")
+
+        for table_row in rows:
+            player_name = table_row.find("a")
+            status = table_row.find("span")
+
+            if player_name != None and status != None:
+                injury_dict[team_names[i].text].append(
+                    (player_name.text + "-" + status.text.replace("GTD", "TBD"))
+                )
+
+    for item in injury_dict.items():
+        print(item)
+
+    print(injury_dict.keys())
+
+    return injury_dict
+
 
 if __name__ == "__main__":
     # collect_range(2005, 2022)
