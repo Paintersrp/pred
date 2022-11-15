@@ -1,12 +1,12 @@
 """
-Docstring
+This scripts contains functions for adding ELO/Massey Ratings to new and historical data
 """
 from datetime import date
 import typing as t
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-import utils
+from scripts import utils
 
 MEAN_ELO = 1500
 ELO_WIDTH = 400

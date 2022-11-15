@@ -3,8 +3,9 @@ This script contains data cleaning/transforming/amending functions
 """
 import pandas as pd
 import numpy as np
-import utils
-from ratings import add_massey, add_elo
+from datetime import date
+from scripts import utils
+from scripts.ratings import add_massey, add_elo
 
 
 def combine_datasets() -> None:
@@ -155,47 +156,39 @@ def initial_odds_stats(data: pd.DataFrame):
     for team in team_list:
         arr = []
 
-        #  Team filters and datasets
         h_games = data.loc[data["Home"] == team].reset_index(drop=True)
         a_games = data.loc[data["Away"] == team].reset_index(drop=True)
 
-        #  COUNT OF GAMES PLAYED FOR EACH CATEGORY
         fav_count = sum(h_games["H_Status"] == "Fav") + sum(
             a_games["A_Status"] == "Fav"
         )
         ud_count = sum(h_games["H_Status"] == "UD") + sum(a_games["A_Status"] == "UD")
         game_count = len(h_games.index) + len(a_games.index)
 
-        #  TEAM % OF APPEARANCE AS
         fav_rate = fav_count / game_count
         ud_rate = ud_count / game_count
 
-        #  WIN % AS FAVORITE
         h_fav_mask = (h_games["H_Status"] == "Fav") & (h_games["MOV"] > 0)
         a_fav_mask = (a_games["A_Status"] == "Fav") & (a_games["MOV"] < 0)
         h_fav_win = sum(h_fav_mask)
         a_fav_win = sum(a_fav_mask)
         fav_win = (h_fav_win + a_fav_win) / fav_count
 
-        #  WIN % AS UNDERDOG
         h_ud_mask = (h_games["H_Status"] == "UD") & (h_games["MOV"] > 0)
         a_ud_mask = (a_games["A_Status"] == "UD") & (a_games["MOV"] < 0)
         h_ud_win = sum(h_ud_mask)
         a_ud_win = sum(a_ud_mask)
         ud_win = (h_ud_win + a_ud_win) / ud_count
 
-        #  % of Team's Games where the spread is covered
         h_spread_mask = h_games["Spread_Outcome"] == 1
         a_spread_mask = a_games["Spread_Outcome"] == 1
         cover_pct = (sum(h_spread_mask) + sum(a_spread_mask)) / game_count
 
-        #  % of Team's Games ending in Under/Over respectively
         under_mask = h_games["O/U_Outcome"] == "Under"
         over_mask = a_games["O/U_Outcome"] == "Over"
         under_pct = (sum(under_mask) + (len(over_mask) - sum(over_mask))) / game_count
         over_pct = (sum(over_mask) + (len(under_mask) - sum(under_mask))) / game_count
 
-        #  Team Upset Defense and Upset Offense
         upset_h_def_games_mask = h_games["H_ML"] < -400
         upset_a_def_games_mask = a_games["A_ML"] < -400
         upset_def_opps = sum(upset_h_def_games_mask) + sum(upset_a_def_games_mask)
@@ -272,7 +265,9 @@ def clean_train() -> None:
 
     data = pd.read_sql_table("raw_data", utils.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
-    data["Outcome"] = np.where(data["H-Pts"] > data["A-Pts"], 1, 0)
+    data["Outcome"] = np.where(
+        data["H-Pts"].astype(float) > data["A-Pts"].astype(float), 1, 0
+    )
 
     data.drop(["Time", "A-Pts", "H-Pts", "OT"], axis=1, inplace=True)
 
@@ -364,13 +359,70 @@ def combine_dailies():
     combined.to_sql("all_stats", utils.ENGINE, if_exists="replace", index=False)
 
 
+def update_history_outcomes() -> None:
+    """
+    Loads most recent prediction history and played game scores
+    Adds actual scores and outcome to prediction history
+    Commits prediction scoring table to database
+    """
+    arr = []
+    predicted = pd.read_sql_table("prediction_history_net", utils.ENGINE)
+    predicted["Actual"] = "TBD"
+
+    played = pd.read_sql_table("2023_played_games", utils.ENGINE)
+
+    pred_mask = predicted["Date"] != str(date.today())
+    predicted = predicted.loc[pred_mask].reset_index(drop=True)
+
+    for d in predicted["Date"].unique():
+        mov_dict = {}
+        played_mask = played["Date"] == d
+        filtered_played = played.loc[played_mask].reset_index(drop=True)
+
+        history_mask = predicted["Date"] == d
+        filtered_predicted = predicted.loc[history_mask].reset_index(drop=True)
+
+        for i in filtered_played.index:
+            mov_dict[filtered_played.at[i, "Away"]] = filtered_played.at[i, "MOV"]
+
+        for i in filtered_predicted.index:
+            filtered_predicted.at[i, "Actual"] = mov_dict[
+                filtered_predicted.at[i, "A_Team"]
+            ]
+
+            if float(filtered_predicted.at[i, "A_Odds"]) > 0.5:
+                if filtered_predicted.at[i, "Actual"] > 0:
+                    filtered_predicted.at[i, "Outcome"] = 0
+                else:
+                    filtered_predicted.at[i, "Outcome"] = 1
+            else:
+                if filtered_predicted.at[i, "Actual"] > 0:
+                    filtered_predicted.at[i, "Outcome"] = 1
+                else:
+                    filtered_predicted.at[i, "Outcome"] = 0
+
+        arr.append(filtered_predicted)
+
+    # filtered_predicted.to_sql(f"prediction_scoring", utils.ENGINE, if_exists="replace", index=False)
+    arr = pd.concat(arr, axis=0, join="outer")
+    # arr.to_sql(f"prediction_scoring", utils.ENGINE, if_exists="replace", index=False)
+    print(arr)
+
+
+def clean_box_data(data: pd.DataFrame) -> pd.DataFrame:
+    data.columns = data.columns
+    data = data.drop(data.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
+    data.columns = utils.BOX_FEATURES
+
+    return data
+
+
 if __name__ == "__main__":
     # combine_datasets()
     # clean_train()
 
-    test_table = pd.read_sql_table("prediction_history", utils.ENGINE)
-    print(test_table)
-
     # raw_data = combine_odds_dataset()
     # full_data = clean_odds_data(raw_data)
     # initial_odds_stats(full_data)
+
+    pass

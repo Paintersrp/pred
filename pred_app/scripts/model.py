@@ -10,6 +10,7 @@ from sklearn.metrics import (
     roc_curve,
     recall_score,
     precision_recall_curve,
+    mean_squared_error,
 )
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
@@ -18,7 +19,7 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 import pandas as pd
 import numpy as np
-import utils
+from scripts import utils
 
 
 FILE_NAME = "xgb_model.sav"
@@ -44,7 +45,7 @@ def test_model(
     cv_count: int = 5,
     epochs: int = 918,
     params: dict = PARAMS,
-) -> tuple[list, list, list, list, list]:
+) -> tuple[list, list, list, list]:
     #pylint: disable=too-many-locals
     """
     Purpose
@@ -255,6 +256,8 @@ def feature_scoring(x_train: list, y_train: list, testing: bool = True) -> pd.Da
     if testing is False:
         scores.to_sql("feature_scores", utils.ENGINE, if_exists="replace", index=False)
 
+    print(scores)
+
     return scores
 
 
@@ -394,21 +397,30 @@ def predict_season(season: str) -> list:
     y_train = x_train["Outcome"]
     y_test = x_test["Outcome"]
 
+    y_train_mov = x_train['MOV']
+    y_test_mov = x_test['MOV']
+
     x_train = x_train[utils.NET_FULL_FEATURES]
     x_test = x_test[utils.NET_FULL_FEATURES]
 
-    x_matrix = xgb.DMatrix(x_train, label=y_train)
-    y_matrix = xgb.DMatrix(x_test, label=y_test)
+    x_matrix = xgb.DMatrix(x_train, label=y_train_mov)
+    y_matrix = xgb.DMatrix(x_test, label=y_test_mov)
 
     xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
     preds = xgb_model.predict(y_matrix)
 
-    for pred in preds:
-        outcomes.append(np.argmax(pred))
+    # for pred in preds:
+    #     outcomes.append(np.argmax(pred))
 
-    arr = get_metrics(y_test, outcomes)
+    #     print(pred)
 
-    return arr
+    mse = mean_squared_error(y_test_mov, preds)
+    print(mse)
+
+    #arr = get_metrics(y_test_mov, preds)
+    #print(arr)
+
+    return mse
 
 
 if __name__ == "__main__":
@@ -416,17 +428,16 @@ if __name__ == "__main__":
     # mask = data["A_Massey"] != 0
     # data = data.loc[mask].reset_index(drop=True)
     # outcome = data["Outcome"]
-
     # data = data[utils.NET_FULL_FEATURES]
 
     # training, testing, actuals, predictions = test_model(data, outcome)
     # scores_table = feature_scoring(training, testing, False)
     # print(scores_table)
     # plot_roc_curve(actuals, predictions)
-    # plot_precision_recall(actuals, predictions)
-
-    predict_season("2019-20")
+    # plot_precision_recall(actuals, predictions    
 
     # hyperparameter_tuning(training, testing, False)
     # trees = find_trees(data, outcome)
     # print(trees)
+
+    predict_season("2019-20")

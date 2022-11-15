@@ -9,11 +9,11 @@ import pandas as pd
 import numpy as np
 import requests
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
-from model import test_model
-from ratings import current_massey
-from scrape import collect_specific
-from transform import combine_dailies
-import utils
+from scripts.model import test_model, feature_scoring
+from scripts.ratings import current_massey
+from scripts.scrape import collect_specific
+from scripts.transform import combine_dailies
+from scripts import utils
 
 SCH_HEADER = {
     "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
@@ -96,11 +96,17 @@ def update_team_stats() -> t.Any:
 def update_massey():
     """
     Retrieves the most up-to-date game results
+    If database is already up-to-date, load rather than collect
     Calculates up-to-date Massey Ratings
     Returns Massey Ratings grouped by Team Name
     """
+    data = pd.read_sql_table("prediction_history_net", utils.ENGINE)
 
-    temp = collect_specific(2023, utils.MONTHS_REG)
+    if data['Date'].unique()[0] != str(date.today()):
+        temp = collect_specific(2023)
+    else:
+        temp = pd.read_sql_table("2023_played_games", utils.ENGINE)
+
     massey_ratings = current_massey(temp, "2022-23")
 
     return massey_ratings
@@ -236,6 +242,7 @@ def daily_pred(
     """
 
     train_data = pd.read_sql_table("training_data", utils.ENGINE)
+    print(train_data)
     mask = train_data["A_Massey"] != 0
     train_data = train_data.loc[mask].reset_index(drop=True)
     outcomes = train_data["Outcome"]
@@ -243,7 +250,9 @@ def daily_pred(
     net_data = train_data[utils.NET_FULL_FEATURES]
     massey_data = train_data[utils.MASSEY_FULL_FEATURES]
 
-    test_model(net_data, outcomes, 2, NET_EPOCHS)
+    training, testing, actuals, predictions = test_model(net_data, outcomes, 2, NET_EPOCHS)
+    feature_scoring(training, testing, True)
+    
 
     final_net = predict_today(
         net_data, outcomes, test_data, test_outcomes, team_data, NET_EPOCHS

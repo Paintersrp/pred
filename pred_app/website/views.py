@@ -1,5 +1,5 @@
 """
-Docstring
+This script contains routes and general functions for flask webpages
 """
 from flask import Blueprint, render_template
 from sqlalchemy import create_engine

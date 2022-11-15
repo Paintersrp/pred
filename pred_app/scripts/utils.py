@@ -1,5 +1,5 @@
 """
-Docstring
+This script contains a timer function and various lists/dictionaries
 """
 import time
 import functools
@@ -161,7 +161,7 @@ team_dict = {
     "Atlanta Hawks": "ATL",
     "Brooklyn Nets": "BRK",
     "New Jersey Nets": "NJN",
-    "Charlotte Hornets": "CHH",
+    "Charlotte Hornets": "CHO",
     "Charlotte Bobcats": "CHA",
     "San Antonio Spurs": "SAS",
     "Los Angeles Clippers": "LAC",
@@ -303,6 +303,56 @@ xgb_narrow_grid = {
     "subsample": [0.8],
     "objective": ["multi:softmax"],
 }
+
+"""
+tables
+"""
+TABLE_STATS_FULL = [
+    "Team",
+    "Record",
+    "FGM",
+    "FGA",
+    "FG_PCT",
+    "FG3M",
+    "FG3A",
+    "FG3_PCT",
+    "FTM",
+    "FTA",
+    "FT_PCT",
+    "OREB",
+    "DREB",
+    "REB",
+    "AST",
+    "TOV",
+    "STL",
+    "BLK",
+    "BLKA",
+    "PF",
+    "PFD",
+    "OFF_RATING",
+    "DEF_RATING",
+    "NET_RATING",
+    "AST_PCT",
+    "EFG_PCT",
+    "TS_PCT",
+    "PIE",
+]
+
+"""
+Features/Columns for Scraping/Transforming Boxscore Data
+"""
+BASIC = ["FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "ORB", "DRB", "TRB", "AST", "STL", "BLK", "TOV", "PF", "PTS"]
+ADVANCED = ["TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "ORtg", "DRtg"]
+GAME = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT", "SeasonID", "MOV", "Outcome"]
+
+BOX_FEATURES = GAME + ["A_" + item for item in BASIC] + ["A_" + item for item in ADVANCED]  + ["H_" + item for item in BASIC] + ["H_" + item for item in ADVANCED]
+
+MATCHUP_FEATURES = ["PTS", "AST", "STL", "BLK", "ORB", "DRB", "TOV", "PF", "TS%", "eFG%", "3PAr", "FTr", "ORtg", "DRtg"]
+AWAY_FEATURES = ["A_" + item for item in MATCHUP_FEATURES]
+HOME_FEATURES = ["H_" + item for item in MATCHUP_FEATURES]
+
+COMPARE_COLS = ["Team", "Record", "Massey", "PTS", "AST", "ORB", "DEF", "OFF", "NET", "PIE", "TS%"]
+ODDS_COLS = ["Team", "Fav_W%", "UD_W%", "Cover%", "Under%", "Over%", "Def_W%", "Off_W%"]
 
 
 def timerun(function):
