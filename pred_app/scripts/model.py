@@ -22,31 +22,15 @@ import numpy as np
 from scripts import utils, const, dicts
 
 
-FILE_NAME = "xgb_model.sav"
-DEF_CLASSIFIER = XGBClassifier(num_class=2)
-
-PARAMS = {
-    "max_depth": 3,
-    "min_child_weight": 5,
-    "eta": 0.01,
-    "colsample_bytree": 0.8,
-    "subsample": 0.8,
-    "objective": "multi:softprob",
-    "num_class": 2,
-}
-
-EPOCHS = 918
-
-
 @utils.timerun
 def test_model(
     training_data: pd.DataFrame,
     target: pd.Series,
     cv_count: int = 5,
     epochs: int = 918,
-    params: dict = PARAMS,
+    params: dict = dicts.PARAMS,
 ) -> tuple[list, list, list, list]:
-    #pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals
     """
     Purpose
     ----------
@@ -272,7 +256,7 @@ def hyperparameter_tuning(x_train: list, y_train: list, testing: bool = True) ->
     ]
 
     rs_model = RandomizedSearchCV(
-        estimator=DEF_CLASSIFIER,
+        estimator=const.DEF_CLASSIFIER,
         param_distributions=dicts.xgb_narrow_grid,
         cv=3,
         verbose=10,
@@ -397,8 +381,8 @@ def predict_season(season: str) -> list:
     y_train = x_train["Outcome"]
     y_test = x_test["Outcome"]
 
-    y_train_mov = x_train['MOV']
-    y_test_mov = x_test['MOV']
+    y_train_mov = x_train["MOV"]
+    y_test_mov = x_test["MOV"]
 
     x_train = x_train[const.NET_FULL_FEATURES]
     x_test = x_test[const.NET_FULL_FEATURES]
@@ -406,7 +390,7 @@ def predict_season(season: str) -> list:
     x_matrix = xgb.DMatrix(x_train, label=y_train_mov)
     y_matrix = xgb.DMatrix(x_test, label=y_test_mov)
 
-    xgb_model = xgb.train(PARAMS, x_matrix, EPOCHS)
+    xgb_model = xgb.train(dicts.PARAMS, x_matrix, const.NET_EPOCHS)
     preds = xgb_model.predict(y_matrix)
 
     # for pred in preds:
@@ -417,8 +401,8 @@ def predict_season(season: str) -> list:
     mse = mean_squared_error(y_test_mov, preds)
     print(mse)
 
-    #arr = get_metrics(y_test_mov, preds)
-    #print(arr)
+    # arr = get_metrics(y_test_mov, preds)
+    # print(arr)
 
     return mse
 
@@ -434,7 +418,7 @@ if __name__ == "__main__":
     # scores_table = feature_scoring(training, testing, False)
     # print(scores_table)
     # plot_roc_curve(actuals, predictions)
-    # plot_precision_recall(actuals, predictions    
+    # plot_precision_recall(actuals, predictions
 
     # hyperparameter_tuning(training, testing, False)
     # trees = find_trees(data, outcome)

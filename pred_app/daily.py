@@ -13,31 +13,7 @@ from scripts.model import test_model, feature_scoring
 from scripts.ratings import current_massey
 from scripts.scrape import collect_sch_by_year
 from scripts.transform import combine_dailies
-from scripts import const, dict
-
-SCH_HEADER = {
-    "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
-    "Chrome/57.0.2987.133 Safari/537.36",
-    "Accept-Language": "en",
-    "origin": "http://stats.nba.com",
-    "Referer": "https://google.com",
-}
-
-YEAR = "20" + date.today().strftime("%y")
-URL = f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{YEAR}/scores/00_todays_scores.json"  # pylint: disable=line-too-long
-
-PARAMS = {
-    "max_depth": 3,
-    "min_child_weight": 5,
-    "eta": 0.01,
-    "colsample_bytree": 0.8,
-    "subsample": 0.8,
-    "objective": "multi:softprob",
-    "num_class": 2,
-}
-
-NET_EPOCHS = 918
-MASSEY_EPOCHS = 5000
+from scripts import const, dicts
 
 
 def get_todays_games(url: str) -> t.Any:
@@ -46,7 +22,7 @@ def get_todays_games(url: str) -> t.Any:
     Returns relevant game data from retrieved json
     """
 
-    req = requests.get(url, headers=SCH_HEADER, timeout=60)
+    req = requests.get(url, headers=const.SCH_HEADER, timeout=60)
     data = req.json().get("gs").get("g")
 
     if not data:
@@ -83,7 +59,7 @@ def update_team_stats() -> t.Any:
     )
 
     team_stats = pd.concat([basic_stats, advanced_stats], axis=1, join="outer")
-    team_stats["Conf"] = team_stats["Team"].map(dict.conf_dict)
+    team_stats["Conf"] = team_stats["Team"].map(dicts.conf_dict)
     team_stats["Record"] = team_stats[["W", "L"]].apply(
         lambda row: "-".join(row.values.astype(str)), axis=1
     )
@@ -102,7 +78,7 @@ def update_massey():
     """
     data = pd.read_sql_table("prediction_history_net", const.ENGINE)
 
-    if data['Date'].unique()[0] != str(date.today()):
+    if data["Date"].unique()[0] != str(date.today()):
         temp = collect_sch_by_year(2023)
     else:
         temp = pd.read_sql_table("2023_played_games", const.ENGINE)
@@ -245,12 +221,14 @@ def daily_pred(
     outcomes = train_data["Outcome"]
     net_data = train_data[const.NET_FULL_FEATURES]
 
-    training, testing, actuals, predictions = test_model(net_data, outcomes, 2, NET_EPOCHS)
-    feature_scoring(training, testing, True)
+    training, testing, actuals, predictions = test_model(
+        net_data, outcomes, 2, const.NET_EPOCHS
+    )
     
+    feature_scoring(training, testing, True)
 
     final_net = predict_today(
-        net_data, outcomes, test_data, test_outcomes, team_data, NET_EPOCHS
+        net_data, outcomes, test_data, test_outcomes, team_data, const.NET_EPOCHS
     )
 
     mask = train_data["A_Massey"] != 0
@@ -259,7 +237,7 @@ def daily_pred(
     massey_data = train_data[const.MASSEY_FULL_FEATURES]
 
     final_massey = predict_today(
-        massey_data, outcomes, test_data, test_outcomes, team_data, MASSEY_EPOCHS
+        massey_data, outcomes, test_data, test_outcomes, team_data, const.MASSEY_EPOCHS
     )
 
     commit_history(final_net, const.NET_FULL_FEATURES)
@@ -320,7 +298,7 @@ def predict_today(
     x_matrix = xgb.DMatrix(train, label=targets)
     y_matrix = xgb.DMatrix(test[train.columns], label=test_targets)
 
-    xgb_model = xgb.train(PARAMS, x_matrix, epochs)
+    xgb_model = xgb.train(dicts.PARAMS, x_matrix, epochs)
     preds = xgb_model.predict(y_matrix)
 
     for pred in preds:
@@ -423,7 +401,7 @@ if __name__ == "__main__":
 
     warnings.filterwarnings("ignore")
 
-    games = get_todays_games(URL)
+    games = get_todays_games(const.SCH_JSON_URL)
     daily_team_stats = update_team_stats()
     ratings = update_massey()
 

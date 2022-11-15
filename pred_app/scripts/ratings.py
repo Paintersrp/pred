@@ -8,10 +8,6 @@ import pandas as pd
 import numpy as np
 from scripts import utils, const, dicts
 
-MEAN_ELO = 1500
-ELO_WIDTH = 400
-K_FACTOR = 64
-
 
 @utils.timerun
 def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
@@ -33,7 +29,7 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
 
         else:
             current_elos = (
-                np.ones(shape=(len(filtered_data["Away"].unique()))) * MEAN_ELO
+                np.ones(shape=(len(filtered_data["Away"].unique()))) * const.MEAN_ELO
             )
 
         map_df = filtered_data.drop(filtered_data.columns[[0, 2, 4]], axis=1)
@@ -77,7 +73,7 @@ def adjust_elo(a_elo: float, h_elo: float, outcome: int) -> tuple[float, float]:
     Changes Elo based on actual and expected outcome
     """
     expected_win = expected_outcome(a_elo, h_elo, outcome)
-    change_in_elo = K_FACTOR * (1 - expected_win)
+    change_in_elo = const.K_FACTOR * (1 - expected_win)
 
     if outcome == 1:
         h_elo += change_in_elo
@@ -94,9 +90,9 @@ def expected_outcome(a_elo: float, h_elo: float, outcome: int) -> float:
     Calculates expected outcome
     """
     if outcome == 1:
-        expected = 1.0 / (1 + 10 ** ((a_elo - h_elo) / ELO_WIDTH))
+        expected = 1.0 / (1 + 10 ** ((a_elo - h_elo) / const.ELO_WIDTH))
     else:
-        expected = 1.0 / (1 + 10 ** ((h_elo - a_elo) / ELO_WIDTH))
+        expected = 1.0 / (1 + 10 ** ((h_elo - a_elo) / const.ELO_WIDTH))
 
     return expected
 
@@ -106,7 +102,7 @@ def update_new_season(elos: t.Any) -> t.Any:
     Uses mean regression to shift teams towards base ELO
     """
 
-    diff_from_mean = elos - MEAN_ELO
+    diff_from_mean = elos - const.MEAN_ELO
     elos -= diff_from_mean / 3
 
     return elos

@@ -1,7 +1,15 @@
 from sqlalchemy import create_engine
+from datetime import date
+from xgboost.sklearn import XGBClassifier
+
+""" SQLAlchemy Database Engine """
 
 
 ENGINE = create_engine("sqlite:///pred.db")
+
+
+""" Headers and URL for retrieving daily schedule """
+
 
 SCH_HEADER = {
     "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
@@ -10,6 +18,23 @@ SCH_HEADER = {
     "origin": "http://stats.nba.com",
     "Referer": "https://google.com",
 }
+
+YEAR = "20" + date.today().strftime("%y")
+SCH_JSON_URL = f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{YEAR}/scores/00_todays_scores.json"  # pylint: disable=line-too-long
+
+
+""" Curent epoch settings for model """
+
+
+NET_EPOCHS = 918
+MASSEY_EPOCHS = 5000
+DEF_CLASSIFIER = XGBClassifier(num_class=2)
+
+
+"""
+Below section contains const lists of months used for a given year
+"""
+
 
 MONTHS_1999 = ["february", "march", "april", "may", "june"]
 MONTHS_2012 = ["december", "january", "february", "march", "april", "may", "june"]
@@ -61,9 +86,12 @@ MONTHS_NO_OCT = [
     "june",
 ]
 
+
 """
 List of various feature sets used for model
 """
+
+
 NET_FULL = [
     "W_PCT",
     "FGM",
@@ -120,9 +148,12 @@ MASSEY_TRUNC_FEATURES = ["A_" + item for item in NET_TRUNC + ["Massey"]] + [
     "H_" + item for item in NET_TRUNC + ["Massey"]
 ]
 
+
 """
 add notes
 """
+
+
 TABLE_STATS_FULL = [
     "Team",
     "Record",
@@ -154,18 +185,106 @@ TABLE_STATS_FULL = [
     "PIE",
 ]
 
+
 """
 Features/Columns for Scraping/Transforming Boxscore Data
 """
-BASIC = ["FG", "FGA", "FG%", "3P", "3PA", "3P%", "FT", "FTA", "FT%", "ORB", "DRB", "TRB", "AST", "STL", "BLK", "TOV", "PF", "PTS"]
-ADVANCED = ["TS%", "eFG%", "3PAr", "FTr", "ORB%", "DRB%", "TRB%", "AST%", "STL%", "BLK%", "TOV%", "ORtg", "DRtg"]
-GAME = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT", "SeasonID", "MOV", "Outcome"]
 
-BOX_FEATURES = GAME + ["A_" + item for item in BASIC] + ["A_" + item for item in ADVANCED]  + ["H_" + item for item in BASIC] + ["H_" + item for item in ADVANCED]
 
-MATCHUP_FEATURES = ["PTS", "AST", "STL", "BLK", "ORB", "DRB", "TOV", "PF", "TS%", "eFG%", "3PAr", "FTr", "ORtg", "DRtg"]
+BASIC = [
+    "FG",
+    "FGA",
+    "FG%",
+    "3P",
+    "3PA",
+    "3P%",
+    "FT",
+    "FTA",
+    "FT%",
+    "ORB",
+    "DRB",
+    "TRB",
+    "AST",
+    "STL",
+    "BLK",
+    "TOV",
+    "PF",
+    "PTS",
+]
+ADVANCED = [
+    "TS%",
+    "eFG%",
+    "3PAr",
+    "FTr",
+    "ORB%",
+    "DRB%",
+    "TRB%",
+    "AST%",
+    "STL%",
+    "BLK%",
+    "TOV%",
+    "ORtg",
+    "DRtg",
+]
+GAME = [
+    "Date",
+    "Time",
+    "Away",
+    "A-Pts",
+    "Home",
+    "H-Pts",
+    "OT",
+    "SeasonID",
+    "MOV",
+    "Outcome",
+]
+
+BOX_FEATURES = (
+    GAME
+    + ["A_" + item for item in BASIC]
+    + ["A_" + item for item in ADVANCED]
+    + ["H_" + item for item in BASIC]
+    + ["H_" + item for item in ADVANCED]
+)
+
+MATCHUP_FEATURES = [
+    "PTS",
+    "AST",
+    "STL",
+    "BLK",
+    "ORB",
+    "DRB",
+    "TOV",
+    "PF",
+    "TS%",
+    "eFG%",
+    "3PAr",
+    "FTr",
+    "ORtg",
+    "DRtg",
+]
 AWAY_FEATURES = ["A_" + item for item in MATCHUP_FEATURES]
 HOME_FEATURES = ["H_" + item for item in MATCHUP_FEATURES]
 
-COMPARE_COLS = ["Team", "Record", "Massey", "PTS", "AST", "ORB", "DEF", "OFF", "NET", "PIE", "TS%"]
+COMPARE_COLS = [
+    "Team",
+    "Record",
+    "Massey",
+    "PTS",
+    "AST",
+    "ORB",
+    "DEF",
+    "OFF",
+    "NET",
+    "PIE",
+    "TS%",
+]
 ODDS_COLS = ["Team", "Fav_W%", "UD_W%", "Cover%", "Under%", "Over%", "Def_W%", "Off_W%"]
+
+
+""" Constants used in ELO Calculations """
+
+
+MEAN_ELO = 1500
+ELO_WIDTH = 400
+K_FACTOR = 64

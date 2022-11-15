@@ -1,6 +1,23 @@
 import const
 
+"""
+Current model hyperparameters
+"""
+
+
+PARAMS = {
+    "max_depth": 3,
+    "min_child_weight": 5,
+    "eta": 0.01,
+    "colsample_bytree": 0.8,
+    "subsample": 0.8,
+    "objective": "multi:softprob",
+    "num_class": 2,
+}
+
+
 """ Maps given year to SeasonID code """
+
 
 season_map = {
     1976: "1975-76",
@@ -53,7 +70,9 @@ season_map = {
     2023: "2022-23",
 }
 
+
 """ Maps year to given played months in a season """
+
 
 months_map = {
     1976: const.MONTHS_REG,
@@ -113,6 +132,7 @@ The below section contains dicts for:
     team    :   team abbreviation
     team    :   conference
 """
+
 
 month_dict = {
     "Jan": "01",
@@ -205,9 +225,12 @@ conf_dict = {
     "Portland Trail Blazers": "West",
 }
 
+
 """
 The below section contains parameter grids for testing hyperparameters
 """
+
+
 xgb_param_grid = {
     "eta": [0.3, 0.4, 0.5, 0.6],
     "max_depth": [1, 2, 3, 5, 7, 9, 13],
