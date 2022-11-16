@@ -2,6 +2,7 @@
 This script contains functions for updating daily tables/running daily predictions
 """
 import warnings
+from scripts import const
 from scripts.updater import Updater
 from scripts.predictor import DailyPredictor
 from scripts.handler import MetricsHandler
@@ -16,13 +17,14 @@ if __name__ == "__main__":
 
     games = Updater.update_games_json()
     daily_team_stats = Updater.update_team_stats()
+    Updater.update_schedule()
     ratings = Updater.update_massey()
 
     #  Daily Predictor handles building and predicting daily games
 
     DailyPredictor.build_test_data(games, daily_team_stats, ratings)
     DailyPredictor.prepare_test_data()
-    metrics_list = DailyPredictor.test_model(cv_count = 2, loud = True)
+    metrics_list = DailyPredictor.test_model(cv_count=10, loud=True)
     scores = DailyPredictor.feature_scoring()
     net_final = DailyPredictor.predict_today()
     DailyPredictor.plot_roc_curve()
@@ -32,7 +34,7 @@ if __name__ == "__main__":
 
     Updater.update_feature_scores(scores)
     Updater.update_metrics(metrics_list)
-    Updater.update_history(net_final, DailyPredictor.features)
+    Updater.update_history(net_final, const.NET_FULL_FEATURES)
     Updater.update_preds(net_final)
     Updater.update_full_stats()
     Updater.update_history_outcomes()
@@ -49,5 +51,6 @@ if __name__ == "__main__":
     print(MetricsHandler.return_todays())
 
     history_data = MetricsHandler.return_pred_history()
+    print("\n")
     print(sum(history_data.Outcome == 1))
     print(sum(history_data.Outcome == 0))

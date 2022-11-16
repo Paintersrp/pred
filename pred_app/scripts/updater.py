@@ -12,7 +12,9 @@ from bs4 import BeautifulSoup
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
-from scripts.scrape import collect_sch_by_year, get_boxscore_data, clean_box_data
+
+# from scripts.scrape import collect_sch_by_year, get_boxscore_data, clean_box_data
+from scripts.scraper import Scraper
 
 
 class Updater:
@@ -22,11 +24,13 @@ class Updater:
 
     def __init__(self):
         self.metrics_table = None
+        self.Scraper = Scraper()
 
     def update_games_json(self) -> t.Any:
         """
         Returns JSON data of today's games from NBA.com
         """
+
         req = requests.get(const.SCH_JSON_URL, headers=const.SCH_HEADER, timeout=60)
         data = req.json().get("gs").get("g")
 
@@ -81,26 +85,50 @@ class Updater:
 
         return team_stats
 
-    def update_massey(self):
+    def update_schedule(self) -> None:
+        """
+        Updates schedule of played and upcoming games
+        """
+
+        played, upcoming = self.Scraper.get_sch_by_year(2023)
+
+        played.to_sql(
+            "2023_played_games", const.ENGINE, if_exists="replace", index=False
+        )
+
+        upcoming.to_sql(
+            "2023_upcoming_games", const.ENGINE, if_exists="replace", index=False
+        )
+
+    def update_massey(self) -> pd.DataFrame:
         """
         Updates and returns current season massey ratings, grouped by Team Name
         """
-        data = pd.read_sql_table("prediction_history_net", const.ENGINE)
 
-        if data["Date"].unique()[0] != str(date.today()):
-            temp = collect_sch_by_year(2023)
-        else:
-            temp = pd.read_sql_table("2023_played_games", const.ENGINE)
+        played = pd.read_sql_table("2023_played_games", const.ENGINE)
 
-        massey_ratings = current_massey(temp, "2022-23")
+        raw_massey = current_massey(played, "2022-23")
+        cur_massey = raw_massey.sort_index(axis=0, ascending=False)
+        cur_massey = cur_massey.groupby("Name").head(1).reset_index(drop=True)
+        cur_massey.drop(cur_massey.tail(1).index, inplace=True)
+        cur_massey["Conf"] = cur_massey["Name"].map(dicts.conf_dict)
+        cur_massey = cur_massey.sort_values("Massey", ascending=False).reset_index(
+            drop=True
+        )
+
+        cur_massey.to_sql(
+            "Current_Massey", const.ENGINE, if_exists="replace", index=False
+        )
+
+        massey_ratings = raw_massey.groupby("Name")
 
         return massey_ratings
-
 
     def update_metrics(self, metrics_data: list) -> pd.DataFrame:
         """
         Builds table of scoring metrics and commits to database
         """
+
         full_data = []
 
         self.metrics_table = pd.DataFrame(
@@ -160,6 +188,7 @@ class Updater:
 
         Uses parameter features to determine which model is being committed
         """
+
         pred_history_update = data[["Date", "A_Team", "A_Odds", "H_Team", "H_Odds"]]
 
         if features == const.NET_FULL_FEATURES:
@@ -262,24 +291,25 @@ class Updater:
                 update_check.remove(game_date)
 
         if not update_check:
-            print("Data is up-to-date.")
-            sys.exit()
+            print("Boxscore data is up-to-date.")
 
         else:
             mask = played["Date"] >= update_check[0]
             games_to_update = played.loc[mask].reset_index(drop=True)
 
-        new_data = get_boxscore_data(games_to_update)
-        new_data = clean_box_data(new_data)
-        new_box = pd.concat([box, new_data], axis=0, join="outer").reset_index(
-            drop=True
-        )
+            new_data = self.Scraper.get_boxscore_data_from_sch(games_to_update)
+            new_data = self.Scraper.clean_boxscore_data(new_data)
+            new_box = pd.concat([box, new_data], axis=0, join="outer").reset_index(
+                drop=True
+            )
 
-        new_box["Outcome"] = np.where(
-            new_box["H-Pts"].astype(float) > new_box["A-Pts"].astype(float), 1, 0
-        )
+            new_box["Outcome"] = np.where(
+                new_box["H-Pts"].astype(float) > new_box["A-Pts"].astype(float), 1, 0
+            )
 
-        new_box.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
+            new_box.to_sql(
+                "boxscore_data", const.ENGINE, if_exists="replace", index=False
+            )
 
     def update_injuries(self) -> defaultdict(list):
         """
@@ -298,29 +328,25 @@ class Updater:
 
         injury_dict = defaultdict(list)
 
-        for i in range(len(unordered_lists)):
-            rows = unordered_lists[i].find_all("li")
-
-            for table_row in rows:
-                player_name = table_row.find("a")
-                status = table_row.find("span")
+        for i, ul in enumerate(unordered_lists):
+            for li in ul.find_all("li"):
+                player_name = li.find("a")
+                status = li.find("span")
 
                 if player_name is not None and status is not None:
                     injury_dict[team_names[i].text].append(
                         (player_name.text + "-" + status.text.replace("GTD", "TBD"))
                     )
 
-        # for item in injury_dict.items():
-        #     print(item)
-
-        # print(injury_dict.keys())
+        print(injury_dict["ORL"])
 
         return injury_dict
 
-    def update_full_stats(self):
+    def update_full_stats(self) -> None:
         """
         Combines daily team stat and massey rating updates for display
         """
+
         massey = pd.read_sql_table("current_massey", const.ENGINE)
         team = pd.read_sql_table("team_stats", const.ENGINE)
         massey.sort_values("Name", ascending=True, inplace=True)
@@ -376,7 +402,9 @@ class Updater:
 
         Commits prediction scoring table to database
         """
-        arr = []
+
+        new_history = []
+
         predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
         predicted["Actual"] = "TBD"
 
@@ -420,19 +448,27 @@ class Updater:
                     else:
                         filtered_predicted.at[i, "Outcome"] = 0
 
-            arr.append(filtered_predicted)
+            new_history.append(filtered_predicted)
 
-        arr = pd.concat(arr, axis=0, join="outer")
-        arr.to_sql("prediction_scoring", const.ENGINE, if_exists="replace", index=False)
+        new_history = pd.concat(new_history, axis=0, join="outer")
 
-        print(arr)
-        print(sum(arr.Outcome == 1))
-        print(sum(arr.Outcome == 0))
+        previous_history = pd.read_sql_table("prediction_scoring", const.ENGINE)
 
-    def update_upcoming(self) -> pd.DataFrame:
+        combined = pd.concat([previous_history, new_history], axis=0, join="outer")
+
+        combined.drop_duplicates(subset=["Date", "A_Team"], keep="first", inplace=True)
+
+        combined = combined.sort_values("Date", ascending=False).reset_index(drop=True)
+
+        combined.to_sql(
+            "prediction_scoring", const.ENGINE, if_exists="replace", index=False
+        )
+
+    def update_upcoming(self) -> None:
         """
         Updates upcoming schedule of unplayed games data
         """
+
         upcoming_games = pd.read_sql_table("2023_upcoming_games", const.ENGINE)
         today_mask = upcoming_games["Date"] != str(date.today())
         upcoming_games = upcoming_games.loc[today_mask].reset_index(drop=True)
@@ -440,15 +476,17 @@ class Updater:
             "upcoming_schedule_table", const.ENGINE, if_exists="replace", index=False
         )
 
-        return upcoming_games
-
-    def update_feature_scores(self, scores):
-        """ Commits feature scores to database """
+    def update_feature_scores(self, scores) -> None:
+        """
+        Commits feature scores to database
+        """
 
         scores.to_sql("feature_scores", const.ENGINE, if_exists="replace", index=False)
 
-    def update_hyper_scores(self, hyper_scores):
-        """ Commits hyperparameter scores to database """
+    def update_hyper_scores(self, hyper_scores) -> None:
+        """
+        Commits hyperparameter scores to database
+        """
 
         hyper_scores.to_sql(
             "hyper_scores", const.ENGINE, if_exists="replace", index=False

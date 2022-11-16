@@ -438,15 +438,6 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     return final
 
 
-#  make scraper use this then commit?
-def clean_box_data(data: pd.DataFrame) -> pd.DataFrame:
-    data.columns = data.columns
-    data = data.drop(data.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
-    data.columns = const.BOX_FEATURES
-
-    return data
-
-
 if __name__ == "__main__":
     # combine_datasets()
     # clean_train()

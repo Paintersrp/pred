@@ -18,7 +18,7 @@ from sklearn.metrics import (
 )
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from scripts import const, dicts, scrape
+from scripts import const, dicts, utils
 
 
 """
@@ -209,7 +209,7 @@ class Predictor:
                 self.outcome_placeholder,
             ) = train_test_split(self.net_data, self.outcomes, test_size=0.15)
         else:
-            season = scrape.map_season(year)
+            season = utils.map_season(year)
             season_mask = self.train_data["SeasonID"] == season
             self.test_data = self.train_data[season_mask]
             self.net_data = self.train_data.drop(

@@ -3,6 +3,7 @@ This script contains utility functions
 """
 import time
 import functools
+from scripts import dicts, const
 
 
 def timerun(function):
@@ -22,6 +23,22 @@ def timerun(function):
         return result
 
     return wrapper
+
+
+def map_months(year: int) -> list:
+    """
+    Returns season's months list for given year
+    """
+
+    return dicts.months_map.get(year, const.MONTHS_REG)
+
+
+def map_season(year: int) -> list:
+    """
+    Returns season's months list for given year
+    """
+
+    return dicts.season_map[year]
 
 
 if __name__ == "__main__":
