@@ -68,6 +68,7 @@ class Predictor:
         cv_count: int = 5,
         epochs: int = 918,
         params: dict = dicts.PARAMS,
+        loud: bool = False,
     ) -> list:
         # pylint: disable=too-many-locals disable=dangerous-default-value
 
@@ -99,6 +100,9 @@ class Predictor:
         params:
             Parameter grid to set the XGB.Booster hyperparameters
 
+        loud:
+            Boolean condition - if true each test will print scoring metrics
+
         Returns
         ----------
         Returns list of model scoring metrics
@@ -122,14 +126,15 @@ class Predictor:
             for pred in preds:
                 self.outcomes_arr.append(np.argmax(pred))
 
-            print(f"      {i+1} of {cv_count} Complete     ")
+            if loud:
+                print(f"      {i+1} of {cv_count} Complete     ")
 
-            arr = self.get_metrics(self.y_test, self.outcomes_arr)
+            arr = self.get_metrics(self.y_test, self.outcomes_arr, loud)
             metrics_list.append(arr)
 
         return metrics_list
 
-    def get_metrics(self, actual: list, prediction: np.ndarray) -> list:
+    def get_metrics(self, actual: list, prediction: np.ndarray, loud: bool) -> list:
         """
         Uses actual outcomes and predicted outcomes to score test metrics
         """
@@ -148,11 +153,12 @@ class Predictor:
         incorrect = int(crosstab[0][1]) + int(crosstab[1][0])
         game_count = len(prediction)
 
-        print(f"{correct} Correct - {incorrect} Incorrect")
-        print(f"Precision: {round(precision,4)}%")
-        print(f"Accuracy:  {round(accuracy,4)}%")
-        print(f"Logloss:   {round(logloss,4)}%")
-        print("-----------------------------")
+        if loud:
+            print(f"{correct} Correct - {incorrect} Incorrect")
+            print(f"Precision: {round(precision,4)}%")
+            print(f"Accuracy:  {round(accuracy,4)}%")
+            print(f"Logloss:   {round(logloss,4)}%")
+            print("-----------------------------")
 
         arr.extend(
             [precision, recall, accuracy, logloss, roc, correct, incorrect, game_count]
@@ -246,8 +252,6 @@ class Predictor:
         scores.columns = ["Specs", "Score"]
         scores = scores.sort_values(["Specs"], ascending=False).reset_index(drop=True)
 
-        print(scores)
-
         return scores
 
     def hyperparameter_tuning(self) -> None:
@@ -282,11 +286,6 @@ class Predictor:
                 hypers.groupby(parameter)["mean_test_score"].agg(np.mean).reset_index()
             )
             temp1 = temp1.sort_values(by=["mean_test_score"], ascending=False)
-            print("\n", temp1)
-
-        print(f"Best score: {rs_model.best_score_}")
-        print(f"Best params: {rs_model.best_params_}")
-        print(f"Best estimator: {rs_model.best_estimator_}")
 
         return hypers
 
@@ -488,7 +487,7 @@ class DailyPredictor(Predictor):
         self,
     ) -> pd.DataFrame:
         #  pylint: disable=too-many-arguments
-        
+
         """
         Purpose
         ----------

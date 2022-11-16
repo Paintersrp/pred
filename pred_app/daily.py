@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     DailyPredictor.build_test_data(games, daily_team_stats, ratings)
     DailyPredictor.prepare_test_data()
-    metrics_list = DailyPredictor.test_model(2)
+    metrics_list = DailyPredictor.test_model(cv_count = 2, loud = True)
     scores = DailyPredictor.feature_scoring()
     net_final = DailyPredictor.predict_today()
     DailyPredictor.plot_roc_curve()
