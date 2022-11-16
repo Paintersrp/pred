@@ -211,6 +211,7 @@ BASIC = [
     "PF",
     "PTS",
 ]
+
 ADVANCED = [
     "TS%",
     "eFG%",
@@ -226,6 +227,7 @@ ADVANCED = [
     "ORtg",
     "DRtg",
 ]
+
 GAME = [
     "Date",
     "Time",
@@ -263,6 +265,7 @@ MATCHUP_FEATURES = [
     "ORtg",
     "DRtg",
 ]
+
 AWAY_FEATURES = ["A_" + item for item in MATCHUP_FEATURES]
 HOME_FEATURES = ["H_" + item for item in MATCHUP_FEATURES]
 
@@ -279,6 +282,7 @@ COMPARE_COLS = [
     "PIE",
     "TS%",
 ]
+
 ODDS_COLS = ["Team", "Fav_W%", "UD_W%", "Cover%", "Under%", "Over%", "Def_W%", "Off_W%"]
 
 

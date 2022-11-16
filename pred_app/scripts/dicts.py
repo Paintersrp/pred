@@ -1,4 +1,4 @@
-import const
+from scripts import const
 
 """
 Current model hyperparameters
@@ -13,6 +13,18 @@ PARAMS = {
     "subsample": 0.8,
     "objective": "multi:softprob",
     "num_class": 2,
+}
+
+TREE_TESTING = {
+    'objective': 'multi:softmax', 
+    'colsample_bytree': 0.8, 
+    'learning_rate': 0.01, 
+    'max_depth': 3, 
+    'min_child_weight': 5, 
+    'subsample': 0.8, 
+    'nthread': 4, 
+    'num_class': 2, 
+    'seed': 27
 }
 
 

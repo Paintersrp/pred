@@ -3,70 +3,9 @@ This scripts contains functions for adding ELO/Massey Ratings to new and histori
 """
 from datetime import date
 import typing as t
-from tqdm import tqdm
 import pandas as pd
 import numpy as np
-from scripts import utils, const, dicts
-
-
-@utils.timerun
-def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
-    """
-    Adds Elo to the file containing the full schedule (2008-2022)
-    """
-    data = pd.read_sql_table("full_sch", const.ENGINE)
-    data["Date"] = pd.to_datetime(data["Date"])
-
-    season = 0
-    full_arrays = []
-
-    for season in tqdm(data["SeasonID"].unique()):
-        filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
-        filtered_data.drop(filtered_data.columns[[1, 6, 7, 8]], axis=1, inplace=True)
-
-        if season > 0:
-            current_elos = update_new_season(current_elos)
-
-        else:
-            current_elos = (
-                np.ones(shape=(len(filtered_data["Away"].unique()))) * const.MEAN_ELO
-            )
-
-        map_df = filtered_data.drop(filtered_data.columns[[0, 2, 4]], axis=1)
-        teams = map_df.stack().unique()
-        teams.sort()
-        f_codes = pd.factorize(teams)
-        f_codes = pd.Series(f_codes[0], f_codes[1])
-        teams = map_df.stack().map(f_codes).unstack()
-
-        filtered_data["Outcome"] = np.where(
-            filtered_data["H-Pts"] > filtered_data["A-Pts"], 1, 0
-        )
-
-        final = pd.concat([teams, filtered_data["Outcome"]], axis=1, join="outer")
-
-        season += 1
-
-        for i in final.index:
-            arr = []
-
-            a_end_elo, h_end_elo = adjust_elo(
-                current_elos[final.at[i, "Away"]],
-                current_elos[final.at[i, "Home"]],
-                final.at[i, "Outcome"],
-            )
-
-            current_elos[final.at[i, "Away"]] = a_end_elo
-            current_elos[final.at[i, "Home"]] = h_end_elo
-
-            arr.extend([round(a_end_elo, 2), round(h_end_elo, 2)])
-            full_arrays.append(arr)
-
-    temp = pd.DataFrame(full_arrays, columns=["A_ELO", "H_ELO"])
-    final = pd.concat([concat_to, temp], axis=1, join="outer")
-
-    return final
-
+from scripts import const, dicts
 
 def adjust_elo(a_elo: float, h_elo: float, outcome: int) -> tuple[float, float]:
     """
@@ -97,7 +36,7 @@ def expected_outcome(a_elo: float, h_elo: float, outcome: int) -> float:
     return expected
 
 
-def update_new_season(elos: t.Any) -> t.Any:
+def update_elo_new_season(elos: t.Any) -> t.Any:
     """
     Uses mean regression to shift teams towards base ELO
     """
@@ -165,67 +104,6 @@ def get_massey(data: pd.DataFrame, season_id: str, game_date: date) -> pd.DataFr
     massey = pd.DataFrame(massey, columns=["Name", "Rating"]).groupby("Name")
 
     return massey
-
-
-@utils.timerun
-def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculates Massey Ratings for all seasons in Training File
-    Concats Massey Ratings to provided file (usually schedule or raw stats)
-    """
-
-    data = pd.read_sql_table("full_sch", const.ENGINE)
-    data["Date"] = pd.to_datetime(data["Date"])
-
-    check_date = date.today()
-    full_arrays = []
-
-    for season in tqdm(data["SeasonID"].unique()):
-        j = 0
-        filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
-
-        for i in filtered_data.index:
-            arr = []
-
-            if j < 55:
-                arr.extend([0, 0])
-                full_arrays.append(arr)
-                j += 1
-
-            else:
-                game_date = filtered_data.at[i, "Date"]
-
-                if check_date != game_date:
-                    check_date = game_date
-                    date_mask = filtered_data["Date"] < game_date
-                    dated_data = filtered_data.loc[date_mask].reset_index(drop=True)
-                    massey = get_massey(dated_data, season, game_date)
-
-                    away_rating = massey.get_group(filtered_data.at[i, "Away"])[
-                        "Rating"
-                    ]
-                    home_rating = massey.get_group(filtered_data.at[i, "Home"])[
-                        "Rating"
-                    ]
-
-                    arr.extend([float(away_rating), float(home_rating)])
-                    full_arrays.append(arr)
-
-                else:
-                    away_rating = massey.get_group(filtered_data.at[i, "Away"])[
-                        "Rating"
-                    ]
-                    home_rating = massey.get_group(filtered_data.at[i, "Home"])[
-                        "Rating"
-                    ]
-
-                    arr.extend([float(away_rating), float(home_rating)])
-                    full_arrays.append(arr)
-
-    final = pd.DataFrame(full_arrays, columns=["A_Massey", "H_Massey"])
-    final = pd.concat([concat_to, final], axis=1, join="outer")
-
-    return final
 
 
 def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:

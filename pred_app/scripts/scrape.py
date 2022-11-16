@@ -206,7 +206,7 @@ def get_boxscore_data(
     averages = pd.DataFrame(list(map(np.ravel, final)))
 
     final = pd.concat([data, averages], axis=1, join="outer")
-    final.to_csv("BoxscoreData_2016.csv", index=None)
+    final.to_csv("BoxscoreData_2014.csv", index=None)
 
     return final
 
@@ -324,82 +324,6 @@ def collect_training_data(
 
     final = pd.concat([filtered, averages], axis=1, join="outer")
     final.to_csv("TrainDataRawAdv.csv", index=None)
-
-
-def update_boxscore_data() -> None:
-    """
-    Loads previous boxscore data and most recent list of played games
-    Compares games in both, filtering to only what's not in the database
-    Scrapes missing game data
-    """
-
-    box = pd.read_sql_table("boxscore_data", const.ENGINE)
-    played = pd.read_sql_table("2023_played_games", const.ENGINE)
-    box["Date"] = pd.to_datetime(box["Date"]).dt.date
-    played["Date"] = pd.to_datetime(played["Date"]).dt.date
-
-    box_dates = box["Date"].unique()
-    played_dates = played["Date"].unique()
-
-    update_check = [ele for ele in played_dates]
-
-    for d in played_dates:
-        if d in box_dates:
-            update_check.remove(d)
-
-    if update_check == []:
-        print("Data is up-to-date.")
-        sys.exit()
-
-    else:
-        mask = played["Date"] >= update_check[0]
-        games_to_update = played.loc[mask].reset_index(drop=True)
-
-    new_data = get_boxscore_data(games_to_update, True)
-    new_data = clean_box_data(new_data)
-    new_box = pd.concat([box, new_data], axis=0, join="outer").reset_index(drop=True)
-
-    new_box["Outcome"] = np.where(
-        new_box["H-Pts"].astype(float) > new_box["A-Pts"].astype(float), 1, 0
-    )
-
-    new_box.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
-
-
-def collect_injuries() -> defaultdict(list):
-    """
-    Collects daily line up reports and enters them into dictionary
-    Returns dictionary of team lineup statuses
-    """
-    url = "https://www.rotowire.com/basketball/nba-lineups.php"
-
-    page = requests.get(url, timeout=60)
-    soup = BeautifulSoup(page.text, "html.parser")
-
-    team_names = soup.find_all(name="div", attrs={"class": "lineup__abbr"})
-
-    unordered_lists = soup.find_all(name="ul", attrs={"class": "lineup__list"})
-
-    injury_dict = defaultdict(list)
-
-    for i in range(len(unordered_lists)):
-        rows = unordered_lists[i].find_all("li")
-
-        for table_row in rows:
-            player_name = table_row.find("a")
-            status = table_row.find("span")
-
-            if player_name != None and status != None:
-                injury_dict[team_names[i].text].append(
-                    (player_name.text + "-" + status.text.replace("GTD", "TBD"))
-                )
-
-    for item in injury_dict.items():
-        print(item)
-
-    print(injury_dict.keys())
-
-    return injury_dict
 
 
 if __name__ == "__main__":

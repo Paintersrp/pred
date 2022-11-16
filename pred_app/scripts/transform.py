@@ -3,9 +3,10 @@ This script contains data cleaning/transforming/amending functions
 """
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from datetime import date
 from scripts import utils, const
-from scripts.ratings import add_massey, add_elo
+from scripts.ratings import get_massey, adjust_elo, update_elo_new_season
 
 
 def combine_datasets() -> None:
@@ -25,7 +26,7 @@ def combine_datasets() -> None:
     final.drop(final[["A_TEAM_NAME", "H_TEAM_NAME"]], axis=1, inplace=True)
     final.to_sql("raw_data", const.ENGINE, if_exists="replace", index=False)
 
-
+#  initialize
 def combine_odds_dataset() -> pd.DataFrame:
     """
     Combines hard-copy seasons of odds data into one
@@ -64,7 +65,7 @@ def combine_odds_dataset() -> pd.DataFrame:
 
     return data
 
-
+#  initialize
 def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds some new columns to the data for analysis
@@ -105,7 +106,7 @@ def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
-
+#  initialize
 def initial_odds_stats(data: pd.DataFrame) -> None:
     #  pylint: disable=too-many-locals
     """
@@ -260,7 +261,7 @@ def initial_odds_stats(data: pd.DataFrame) -> None:
     final_data = round(final_data, 3)
     final_data.to_sql("odds_stats", const.ENGINE, if_exists="replace", index=False)
 
-
+#  initialize
 @utils.timerun
 def clean_train() -> None:
     """
@@ -280,7 +281,7 @@ def clean_train() -> None:
     # data = add_elo(data)
     data.to_sql("training_data", const.ENGINE, if_exists="replace", index=False)
 
-
+#  initialize
 def commit_sch():
     """
     Commits hard copy full schedule file to database
@@ -289,7 +290,7 @@ def commit_sch():
     data = set_extras(data)
     data.to_sql("full_sch", const.ENGINE, if_exists="replace", index=False)
 
-
+#  initialize
 def set_extras(data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Season ID and MOV columns
@@ -311,108 +312,124 @@ def set_extras(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
-
-def combine_dailies():
+def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
-    Combines daily team stat and massey rating updates
+    Calculates Massey Ratings for all seasons in Training File
+    Concats Massey Ratings to provided file (usually schedule or raw stats)
     """
-    massey = pd.read_sql_table("current_massey", const.ENGINE)
-    team = pd.read_sql_table("team_stats", const.ENGINE)
-    massey.sort_values("Name", ascending=True, inplace=True)
-    massey.reset_index(drop=True, inplace=True)
 
-    combined = pd.concat([team, massey["Massey"]], axis=1, join="outer")
-    combined = combined[combined.columns.drop(list(combined.filter(regex="_RANK")))]
+    data = pd.read_sql_table("full_sch", const.ENGINE)
+    data["Date"] = pd.to_datetime(data["Date"])
 
-    combined = combined[
-        [
-            "Team",
-            "Record",
-            "Conf",
-            "Massey",
-            "PTS",
-            "AST",
-            "STL",
-            "BLK",
-            "TOV",
-            "OREB",
-            "DREB",
-            "OFF_RATING",
-            "DEF_RATING",
-            "NET_RATING",
-            "PIE",
-            "FG_PCT",
-            "FG3_PCT",
-            "TS_PCT",
-        ]
-    ]
+    check_date = date.today()
+    full_arrays = []
 
-    combined = combined.rename(
-        columns={
-            "TS_PCT": "TS%",
-            "OFF_RATING": "OFF",
-            "DEF_RATING": "DEF",
-            "NET_RATING": "NET",
-            "OREB": "ORB",
-            "DREB": "DRB",
-            "FG_PCT": "FG%",
-            "FG3_PCT": "FG3%",
-        }
-    )
+    for season in tqdm(data["SeasonID"].unique()):
+        j = 0
+        filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
 
-    combined["Massey"] = round(combined["Massey"], 2)
-    combined.to_sql("all_stats", const.ENGINE, if_exists="replace", index=False)
+        for i in filtered_data.index:
+            arr = []
 
+            if j < 55:
+                arr.extend([0, 0])
+                full_arrays.append(arr)
+                j += 1
 
-def update_history_outcomes() -> None:
-    """
-    Loads most recent prediction history and played game scores
-    Adds actual scores and outcome to prediction history
-    Commits prediction scoring table to database
-    """
-    arr = []
-    predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
-    predicted["Actual"] = "TBD"
-
-    played = pd.read_sql_table("2023_played_games", const.ENGINE)
-
-    pred_mask = predicted["Date"] != str(date.today())
-    predicted = predicted.loc[pred_mask].reset_index(drop=True)
-
-    for d in predicted["Date"].unique():
-        mov_dict = {}
-        played_mask = played["Date"] == d
-        filtered_played = played.loc[played_mask].reset_index(drop=True)
-
-        history_mask = predicted["Date"] == d
-        filtered_predicted = predicted.loc[history_mask].reset_index(drop=True)
-
-        for i in filtered_played.index:
-            mov_dict[filtered_played.at[i, "Away"]] = filtered_played.at[i, "MOV"]
-
-        for i in filtered_predicted.index:
-            filtered_predicted.at[i, "Actual"] = mov_dict[
-                filtered_predicted.at[i, "A_Team"]
-            ]
-
-            if float(filtered_predicted.at[i, "A_Odds"]) > 0.5:
-                if filtered_predicted.at[i, "Actual"] > 0:
-                    filtered_predicted.at[i, "Outcome"] = 0
-                else:
-                    filtered_predicted.at[i, "Outcome"] = 1
             else:
-                if filtered_predicted.at[i, "Actual"] > 0:
-                    filtered_predicted.at[i, "Outcome"] = 1
+                game_date = filtered_data.at[i, "Date"]
+
+                if check_date != game_date:
+                    check_date = game_date
+                    date_mask = filtered_data["Date"] < game_date
+                    dated_data = filtered_data.loc[date_mask].reset_index(drop=True)
+                    massey = get_massey(dated_data, season, game_date)
+
+                    away_rating = massey.get_group(filtered_data.at[i, "Away"])[
+                        "Rating"
+                    ]
+                    home_rating = massey.get_group(filtered_data.at[i, "Home"])[
+                        "Rating"
+                    ]
+
+                    arr.extend([float(away_rating), float(home_rating)])
+                    full_arrays.append(arr)
+
                 else:
-                    filtered_predicted.at[i, "Outcome"] = 0
+                    away_rating = massey.get_group(filtered_data.at[i, "Away"])[
+                        "Rating"
+                    ]
+                    home_rating = massey.get_group(filtered_data.at[i, "Home"])[
+                        "Rating"
+                    ]
 
-        arr.append(filtered_predicted)
+                    arr.extend([float(away_rating), float(home_rating)])
+                    full_arrays.append(arr)
 
-    arr = pd.concat(arr, axis=0, join="outer")
-    # arr.to_sql(f"prediction_scoring", const.ENGINE, if_exists="replace", index=False)
-    print(arr)
+    final = pd.DataFrame(full_arrays, columns=["A_Massey", "H_Massey"])
+    final = pd.concat([concat_to, final], axis=1, join="outer")
 
+    return final
 
+@utils.timerun
+def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds Elo to the file containing the full schedule (2008-2022)
+    """
+    data = pd.read_sql_table("full_sch", const.ENGINE)
+    data["Date"] = pd.to_datetime(data["Date"])
+
+    season = 0
+    full_arrays = []
+
+    for season in tqdm(data["SeasonID"].unique()):
+        filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
+        filtered_data.drop(filtered_data.columns[[1, 6, 7, 8]], axis=1, inplace=True)
+
+        if season > 0:
+            current_elos = update_elo_new_season(current_elos)
+
+        else:
+            current_elos = (
+                np.ones(shape=(len(filtered_data["Away"].unique()))) * const.MEAN_ELO
+            )
+
+        map_df = filtered_data.drop(filtered_data.columns[[0, 2, 4]], axis=1)
+        teams = map_df.stack().unique()
+        teams.sort()
+        f_codes = pd.factorize(teams)
+        f_codes = pd.Series(f_codes[0], f_codes[1])
+        teams = map_df.stack().map(f_codes).unstack()
+
+        filtered_data["Outcome"] = np.where(
+            filtered_data["H-Pts"] > filtered_data["A-Pts"], 1, 0
+        )
+
+        final = pd.concat([teams, filtered_data["Outcome"]], axis=1, join="outer")
+
+        season += 1
+
+        for i in final.index:
+            arr = []
+
+            a_end_elo, h_end_elo = adjust_elo(
+                current_elos[final.at[i, "Away"]],
+                current_elos[final.at[i, "Home"]],
+                final.at[i, "Outcome"],
+            )
+
+            current_elos[final.at[i, "Away"]] = a_end_elo
+            current_elos[final.at[i, "Home"]] = h_end_elo
+
+            arr.extend([round(a_end_elo, 2), round(h_end_elo, 2)])
+            full_arrays.append(arr)
+
+    temp = pd.DataFrame(full_arrays, columns=["A_ELO", "H_ELO"])
+    final = pd.concat([concat_to, temp], axis=1, join="outer")
+
+    return final
+
+#  make scraper use this then commit?
 def clean_box_data(data: pd.DataFrame) -> pd.DataFrame:
     data.columns = data.columns
     data = data.drop(data.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
