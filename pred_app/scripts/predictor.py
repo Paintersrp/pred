@@ -1,3 +1,6 @@
+"""
+This module contains ML Model Predictor Classes and Methods
+"""
 import pickle
 import typing as t
 import numpy as np
@@ -12,36 +15,53 @@ from sklearn.metrics import (
     roc_curve,
     recall_score,
     precision_recall_curve,
-    mean_squared_error,
 )
 from sklearn.feature_selection import SelectKBest, f_classif
-from xgboost.sklearn import XGBClassifier
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from scripts import const, dicts, scrape
 
-# add base class and general predictor
 
-
-""""  
+"""
 mask = train_data["A_Massey"] != 0
 train_data = train_data.loc[mask].reset_index(drop=True)
 outcomes = train_data["Outcome"]
 massey_data = train_data[const.MASSEY_FULL_FEATURES]
-
-
-def save_model(model: xgb.Booster) -> None:
-    pickle.dump(model, open("model.pkl", "wb"))
-
-def load_model() -> xgb.Booster:
-    model = pickle.load(open("model.pkl", "rb"))
-
-
 """
+
+
 class Predictor:
+    #  pylint: disable=too-many-instance-attributes
+    """
+    Base Predictor class
+
+    Contains methods for scoring and manipulating Prediction models
+    """
+
     def __init__(self):
         self.train_data = pd.read_sql_table("training_data", const.ENGINE)
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data[const.NET_FULL_FEATURES]
+        self.model = None
+        self.outcomes_arr = None
+        self.outcome_placeholder = None
+        self.y_test = None
+        self.test_data = None
+
+    def save_model(self, model: xgb.Booster) -> None:
+        """
+        Saves current model
+        """
+
+        with open(f"{const.FILE_NAME}", "wb") as handle:
+            pickle.dump(model, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_model(self) -> xgb.Booster:
+        """
+        Loads saved model
+        """
+
+        with open(f"{const.FILE_NAME}", "rb") as handle:
+            self.model = pickle.load(handle)
 
     def test_model(
         self,
@@ -49,33 +69,29 @@ class Predictor:
         epochs: int = 918,
         params: dict = dicts.PARAMS,
     ) -> list:
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals disable=dangerous-default-value
+
         """
         Purpose
         ----------
         Builds DMatrixs for model testing
+
         x_matrix = training data and training targets
+
         y_matrix = testing data and testing targets
 
         Trains model on full dataset (x_matrix)
+
         Calls prediction function on test dataset (y_matrix)
+
         Scores metrics for model
+
         Repeats tests and training x num of times (cv_count)
-        Builds metrics table based on cross validation metric scores
 
         Parameters
         ----------
-        training_data:
-            DataFrame containing feature filtered training data
-
-        target:
-            DataFrame containing training prediction targets (Outcome/Spread)
-
         cv_count:
             Integer denoting how many cross validation tests to run
-
-        test_targets:
-        DataFrame containing testing prediction targets (Outcome/Spread)
 
         epochs:
             Number of estimators/trees for the model to use
@@ -85,35 +101,25 @@ class Predictor:
 
         Returns
         ----------
-        Returns tuple:
-            x_train:
-                Training dataset
-
-            y_train:
-                Training dataset target
-
-            y_test:
-                Testing dataset target
-
-            outcomes:
-                Predicted testing dataset targets
+        Returns list of model scoring metrics
         """
+
         metrics_list = []
 
         for i in range(cv_count):
             self.outcomes_arr = []
 
-            self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
+            x_train, x_test, y_train, self.y_test = train_test_split(
                 self.net_data, self.outcomes, test_size=0.15
             )
 
-            self.x_matrix = xgb.DMatrix(self.x_train, label=self.y_train)
-            self.y_matrix = xgb.DMatrix(self.x_test, label=self.y_test)
+            x_matrix = xgb.DMatrix(x_train, label=y_train)
+            y_matrix = xgb.DMatrix(x_test, label=self.y_test)
 
-            self.xgb_model = xgb.train(params, self.x_matrix, epochs)
-            self.preds = self.xgb_model.predict(self.y_matrix)
+            self.model = xgb.train(params, x_matrix, epochs)
+            preds = self.model.predict(y_matrix)
 
-            for pred in self.preds:
+            for pred in preds:
                 self.outcomes_arr.append(np.argmax(pred))
 
             print(f"      {i+1} of {cv_count} Complete     ")
@@ -127,6 +133,7 @@ class Predictor:
         """
         Uses actual outcomes and predicted outcomes to score test metrics
         """
+
         arr = []
 
         combined = pd.DataFrame(dict(actual=actual, prediction=prediction))
@@ -159,58 +166,60 @@ class Predictor:
         year: int = 2022,
     ) -> pd.DataFrame:
         #  pylint: disable=too-many-arguments
+
         """
         Purpose
         ----------
+        General prediction function, split by year or randomly
+
         Builds DMatrixs for model testing
+
         x_matrix = training data and training targets
+
         y_matrix = testing data and testing targets
 
-        Trains model on full dataset (x_matrix)
+        Trains model on filtered dataset (x_matrix)
+
         Calls prediction function on test dataset (y_matrix)
-        Combines model predictions with teams display data
 
         Parameters
         ----------
-        train:
-            DataFrame containing feature filtered training data
+        random:
+            Boolean condition - if true data is randomly split and tested
 
-        targets:
-            DataFrame containing training prediction targets (Outcome/Spread)
-
-        test:
-            DataFrame containing feature filtered testing data
-
-        test_targets:
-        DataFrame containing testing prediction targets (Outcome/Spread)
-
-        teams:
-            Condensed DataFrame of today's games and stats used for display
-
-        epochs:
-            Number of estimators/trees for the model to use
+        year:
+            If not random, split and test data on a given year/season
 
         Returns
         ----------
-        Returns combined prediction table
+        DataFrame of Predictions
         """
 
         if random:
-            self.net_data, self.test_data, self.outcomes, self.outcome_placeholder = train_test_split(
-                self.net_data, self.outcomes, test_size=0.15
-            )
+            (
+                self.net_data,
+                self.test_data,
+                self.outcomes,
+                self.outcome_placeholder,
+            ) = train_test_split(self.net_data, self.outcomes, test_size=0.15)
         else:
             season = scrape.map_season(year)
             season_mask = self.train_data["SeasonID"] == season
             self.test_data = self.train_data[season_mask]
-            self.net_data = self.train_data.drop(self.train_data[season_mask].index, axis=0)
+            self.net_data = self.train_data.drop(
+                self.train_data[season_mask].index, axis=0
+            )
             self.outcomes = self.net_data["Outcome"]
             self.outcome_placeholder = self.test_data["Outcome"]
 
         self.outcomes_arr = []
 
-        x_matrix = xgb.DMatrix(self.net_data[const.NET_FULL_FEATURES], label=self.outcomes)
-        y_matrix = xgb.DMatrix(self.test_data[const.NET_FULL_FEATURES], label=self.outcome_placeholder)
+        x_matrix = xgb.DMatrix(
+            self.net_data[const.NET_FULL_FEATURES], label=self.outcomes
+        )
+        y_matrix = xgb.DMatrix(
+            self.test_data[const.NET_FULL_FEATURES], label=self.outcome_placeholder
+        )
 
         xgb_model = xgb.train(dicts.PARAMS, x_matrix, const.NET_EPOCHS)
         preds = xgb_model.predict(y_matrix)
@@ -220,11 +229,13 @@ class Predictor:
 
         self.get_metrics(self.outcome_placeholder, self.outcomes_arr)
 
+        return preds
 
     def feature_scoring(self) -> pd.DataFrame:
         """
         Test Feature Importances and returns DataFrame of scores
         """
+
         best = SelectKBest(score_func=f_classif, k="all")
         fit = best.fit(self.net_data, self.outcomes)
 
@@ -241,9 +252,11 @@ class Predictor:
 
     def hyperparameter_tuning(self) -> None:
         """
-        Tests hyperparameters based on a narrow grid of options randomly to find the best combinations
+        Tests hyperparameters based on a narrow grid of options randomly, scoring each
+
         Prints breakdown of hyperparameter scoring
         """
+
         parameters = ["param_" + params for params in dicts.xgb_narrow_grid] + [
             "mean_test_score"
         ]
@@ -259,13 +272,15 @@ class Predictor:
         )
 
         rs_model.fit(self.net_data, self.outcomes)
-        result = pd.DataFrame(rs_model.cv_results_)[parameters]
-        result = result.sort_values(by=["mean_test_score"], ascending=False)
+        hypers = pd.DataFrame(rs_model.cv_results_)[parameters]
+        hypers = hypers.sort_values(by=["mean_test_score"], ascending=False)
 
         parameters.remove("mean_test_score")
 
         for parameter in parameters:
-            temp1 = result.groupby(parameter)["mean_test_score"].agg(np.mean).reset_index()
+            temp1 = (
+                hypers.groupby(parameter)["mean_test_score"].agg(np.mean).reset_index()
+            )
             temp1 = temp1.sort_values(by=["mean_test_score"], ascending=False)
             print("\n", temp1)
 
@@ -273,7 +288,7 @@ class Predictor:
         print(f"Best params: {rs_model.best_params_}")
         print(f"Best estimator: {rs_model.best_estimator_}")
 
-        return result
+        return hypers
 
     def find_trees(
         self,
@@ -281,6 +296,7 @@ class Predictor:
         """
         Finds the ideal number of trees for the model
         """
+
         x_matrix = xgb.DMatrix(self.net_data, label=self.outcomes)
 
         cv_result = xgb.cv(
@@ -292,10 +308,10 @@ class Predictor:
             early_stopping_rounds=50,
         )
 
-        self.trees = cv_result.shape[0]
-        print(self.trees)
+        trees = cv_result.shape[0]
+        print(trees)
 
-        return self.trees
+        return trees
 
     def plot_roc_curve(self) -> None:
         """
@@ -319,11 +335,15 @@ class Predictor:
         Plots and saves a Precision-Recall plot image
         """
 
-        precision, recall, dummy = precision_recall_curve(self.y_test, self.outcomes_arr)
+        precision, recall, dummy = precision_recall_curve(
+            self.y_test, self.outcomes_arr
+        )
 
         _, axis = plt.subplots()
         axis.plot(recall, precision, color="royalblue", label="PRED")
-        axis.plot([0, 1], [0.01, 0.01], color="firebrick", linestyle="--", label="Baseline")
+        axis.plot(
+            [0, 1], [0.01, 0.01], color="firebrick", linestyle="--", label="Baseline"
+        )
         plt.xlim([0, 1])
         plt.ylim([0, 1])
         axis.set_title("Precision-Recall Curve")
@@ -332,15 +352,46 @@ class Predictor:
         plt.legend(loc="best")
         plt.gcf().savefig("Precision_Recall_Curve.png", dpi=1200)
 
+
 class DailyPredictor(Predictor):
+    """
+    Daily Predictor Class
+
+    Contains methods for predicting today's games
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.game_data = None
+        self.team_data = None
+        self.features = None
+
     def build_test_data(
-    self, data: t.Any, team_stats: t.Any, massey_ratings: t.Any
+        self, data: t.Any, team_stats: t.Any, massey_ratings: t.Any
     ) -> pd.DataFrame:
-    #  pylint: disable=too-many-locals
+        #  pylint: disable=too-many-locals
+
         """
+        Purpose
+        ------------
         Parses general game data from schedule json
+
         Adds team stats and massey ratings to game data
-        Returns game data and team stats to be featured
+
+        Parameters
+        -----------
+        data:
+            Schedule data JSON
+
+        team_stats:
+            Up-to-date team stats, grouped by team name
+
+        massey_ratings:
+            Up-to-date massey ratings, grouped by team name
+
+        Returns
+        ------------
+        Game data and team stats to be featured
         """
 
         full_arrays = []
@@ -389,7 +440,9 @@ class DailyPredictor(Predictor):
             "H_" + col for col in home_stats.columns
         ]
 
-        game_data = pd.DataFrame(list(map(np.ravel, full_arrays)), columns=self.features)
+        game_data = pd.DataFrame(
+            list(map(np.ravel, full_arrays)), columns=self.features
+        )
 
         rating_data = pd.DataFrame(
             ratings_array,
@@ -398,12 +451,16 @@ class DailyPredictor(Predictor):
 
         self.game_data = pd.concat([game_data, rating_data], axis=1, join="outer")
 
+        return self.game_data
+
     def prepare_test_data(
         self,
     ):
         """
         Adds placeholder outcomes for today's games
+
         Builds team data table from game data for condesenced display table
+
         Returns amended game data, placeholder outcomes, and team data
         """
 
@@ -431,36 +488,21 @@ class DailyPredictor(Predictor):
         self,
     ) -> pd.DataFrame:
         #  pylint: disable=too-many-arguments
+        
         """
         Purpose
         ----------
         Builds DMatrixs for model testing
+
         x_matrix = training data and training targets
+
         y_matrix = testing data and testing targets
 
         Trains model on full dataset (x_matrix)
+
         Calls prediction function on test dataset (y_matrix)
+
         Combines model predictions with teams display data
-
-        Parameters
-        ----------
-        train:
-            DataFrame containing feature filtered training data
-
-        targets:
-            DataFrame containing training prediction targets (Outcome/Spread)
-
-        test:
-            DataFrame containing feature filtered testing data
-
-        test_targets:
-        DataFrame containing testing prediction targets (Outcome/Spread)
-
-        teams:
-            Condensed DataFrame of today's games and stats used for display
-
-        epochs:
-            Number of estimators/trees for the model to use
 
         Returns
         ----------
@@ -470,14 +512,20 @@ class DailyPredictor(Predictor):
         full_preds = []
 
         x_matrix = xgb.DMatrix(self.net_data, label=self.outcomes)
-        y_matrix = xgb.DMatrix(self.test_data[self.net_data.columns], label=self.outcome_placeholder)
+        y_matrix = xgb.DMatrix(
+            self.test_data[self.net_data.columns], label=self.outcome_placeholder
+        )
 
         xgb_model = xgb.train(dicts.PARAMS, x_matrix, const.NET_EPOCHS)
         preds = xgb_model.predict(y_matrix)
 
         for pred in preds:
             full_preds.append(
-                (round(pred[0], 3), round(pred[1], 3), f"{pred[0]:.3f} vs. {pred[1]:.3f}")
+                (
+                    round(pred[0], 3),
+                    round(pred[1], 3),
+                    f"{pred[0]:.3f} vs. {pred[1]:.3f}",
+                )
             )
 
         pred_data = pd.DataFrame(

@@ -15,6 +15,7 @@ from tqdm import tqdm
 from scripts.transform import set_extras, clean_box_data
 from scripts import utils, const, dicts
 
+
 def scrape_sch(year: str, months: list) -> pd.DataFrame:
     arrays = []
 
@@ -49,17 +50,20 @@ def scrape_sch(year: str, months: list) -> pd.DataFrame:
 
     return arrays
 
+
 def map_months(year: int) -> list:
     """
     Returns season's months list for given year
     """
     return dicts.months_map.get(year, const.MONTHS_REG)
 
+
 def map_season(year: int) -> list:
     """
     Returns season's months list for given year
     """
-    return dicts.season_map[year]   
+    return dicts.season_map[year]
+
 
 @utils.timerun
 def collect_sch_by_year(year: int) -> pd.DataFrame:
@@ -206,7 +210,7 @@ def get_boxscore_data(
     averages = pd.DataFrame(list(map(np.ravel, final)))
 
     final = pd.concat([data, averages], axis=1, join="outer")
-    final.to_csv("BoxscoreData_2014.csv", index=None)
+    final.to_csv("BoxscoreData_2013.csv", index=None)
 
     return final
 

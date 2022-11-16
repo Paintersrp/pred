@@ -26,6 +26,7 @@ def combine_datasets() -> None:
     final.drop(final[["A_TEAM_NAME", "H_TEAM_NAME"]], axis=1, inplace=True)
     final.to_sql("raw_data", const.ENGINE, if_exists="replace", index=False)
 
+
 #  initialize
 def combine_odds_dataset() -> pd.DataFrame:
     """
@@ -64,6 +65,7 @@ def combine_odds_dataset() -> pd.DataFrame:
     )
 
     return data
+
 
 #  initialize
 def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
@@ -105,6 +107,7 @@ def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
     )
 
     return data
+
 
 #  initialize
 def initial_odds_stats(data: pd.DataFrame) -> None:
@@ -261,6 +264,7 @@ def initial_odds_stats(data: pd.DataFrame) -> None:
     final_data = round(final_data, 3)
     final_data.to_sql("odds_stats", const.ENGINE, if_exists="replace", index=False)
 
+
 #  initialize
 @utils.timerun
 def clean_train() -> None:
@@ -281,6 +285,7 @@ def clean_train() -> None:
     # data = add_elo(data)
     data.to_sql("training_data", const.ENGINE, if_exists="replace", index=False)
 
+
 #  initialize
 def commit_sch():
     """
@@ -289,6 +294,7 @@ def commit_sch():
     data = pd.read_csv("FullGamesFinal.csv")
     data = set_extras(data)
     data.to_sql("full_sch", const.ENGINE, if_exists="replace", index=False)
+
 
 #  initialize
 def set_extras(data: pd.DataFrame) -> pd.DataFrame:
@@ -311,6 +317,7 @@ def set_extras(data: pd.DataFrame) -> pd.DataFrame:
         data.at[i, "MOV"] = int(data.at[i, "H-Pts"]) - int(data.at[i, "A-Pts"])
 
     return data
+
 
 def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
@@ -371,6 +378,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
 
     return final
 
+
 @utils.timerun
 def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
@@ -428,6 +436,7 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     final = pd.concat([concat_to, temp], axis=1, join="outer")
 
     return final
+
 
 #  make scraper use this then commit?
 def clean_box_data(data: pd.DataFrame) -> pd.DataFrame:

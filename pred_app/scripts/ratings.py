@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from scripts import const, dicts
 
+
 def adjust_elo(a_elo: float, h_elo: float, outcome: int) -> tuple[float, float]:
     """
     Changes Elo based on actual and expected outcome

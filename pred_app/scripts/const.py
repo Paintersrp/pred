@@ -29,6 +29,7 @@ SCH_JSON_URL = f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{YEAR
 NET_EPOCHS = 918
 MASSEY_EPOCHS = 5000
 DEF_CLASSIFIER = XGBClassifier(num_class=2)
+FILE_NAME = "model.pk"
 
 
 """
