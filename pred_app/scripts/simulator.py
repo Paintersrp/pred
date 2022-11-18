@@ -33,10 +33,7 @@ class Simulator:
 
         pred_history_data = self.Handler.return_pred_history()
         current_data = self.Handler.return_current_odds_history()
-
         pred_history_data = pred_history_data.rename(columns={"Outcome": "Bet_Status"})
-        # pred_list = pred_history_data["Date"].unique()
-        # cur_list = current_data["Date"].unique()
 
         filter_check = list(current_data["Date"].unique())
 
@@ -151,12 +148,14 @@ class Simulator:
         Func
         """
 
-        #  maybe add return totals to csv before sending
+        #  maybe add return totals to csv before
+
         data = self.data
         data2 = pd.DataFrame(
             ["-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"]
             + list(self.return_totals())
         ).T
+
         data2.columns = data.columns
         data = pd.concat([data, data2], axis=0, join="outer").reset_index(drop=True)
         data.to_csv("SimulatorResults.csv", index=None)
@@ -171,7 +170,8 @@ class SimRandom(Simulator):
         super().__init__(bet_value)
         self.win_rate = win_rate
         self.num_games = num_games
-        self.data = self.reroll()
+        self.sim_data = []
+        self.reroll()
 
     def reroll(self) -> pd.DataFrame:
         """
@@ -179,7 +179,7 @@ class SimRandom(Simulator):
         """
 
         sim_data = self.Handler.return_sim_data()
-        print(sim_data)
+        # print(sim_data)
         sim_data = sim_data.sample(self.num_games).reset_index(drop=True)
         faux_outcomes = np.random.binomial(1, self.win_rate, sim_data.shape[0])
         sim_data["Bet_Status"] = faux_outcomes
@@ -204,9 +204,7 @@ class SimRandom(Simulator):
             -abs(self.bet_value),
         )
 
-        print(sim_data)
-
-        return sim_data
+        self.data = sim_data
 
     def update_win_rate(self, win_rate) -> None:
         """

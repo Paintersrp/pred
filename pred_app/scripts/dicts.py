@@ -248,11 +248,11 @@ odds_team_dict = {
     "Denver": "Denver Nuggets",
     "Detroit": "Detroit Pistons",
     "GoldenState": "Golden State Warriors",
-    "Golden State": "Golden State Warriors",
+    "Golden State": "Golden State Warriors",  # intentional duplicate
     "Houston": "Houston Rockets",
     "Indiana": "Indiana Pacers",
     "LAClippers": "Los Angeles Clippers",
-    "LA Clippers": "Los Angeles Clippers",
+    "LA Clippers": "Los Angeles Clippers",  # intentional duplicate
     "LALakers": "Los Angeles Lakers",
     "Memphis": "Memphis Grizzlies",
     "Miami": "Miami Heat",
@@ -262,7 +262,7 @@ odds_team_dict = {
     "NewOrleans": "New Orleans Pelicans",
     "NewYork": "New York Knicks",
     "OklahomaCity": "Oklahoma City Thunder",
-    "Oklahoma City": "Oklahoma City Thunder",
+    "Oklahoma City": "Oklahoma City Thunder",  # intentional duplicate
     "Orlando": "Orlando Magic",
     "Philadelphia": "Philadelphia 76ers",
     "Phoenix": "Phoenix Suns",
