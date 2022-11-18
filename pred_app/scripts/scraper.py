@@ -166,7 +166,7 @@ class Scraper:
         averages = pd.DataFrame(list(map(np.ravel, final)))
 
         final = pd.concat([data, averages], axis=1, join="outer")
-        final.to_csv("BoxscoreData_2008.csv", index=None)
+        final.to_csv("BoxscoreData_2007.csv", index=None)
 
         return final
 
