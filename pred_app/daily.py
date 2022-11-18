@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     DailyPredictor.build_test_data(games, daily_team_stats, ratings)
     DailyPredictor.prepare_test_data()
-    metrics_list = DailyPredictor.test_model(cv_count=10, loud=True)
+    metrics_list = DailyPredictor.test_model(cv_count=1, loud=True)
     scores = DailyPredictor.feature_scoring()
     net_final = DailyPredictor.predict_today()
     DailyPredictor.plot_roc_curve()
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     print(MetricsHandler.return_feature_scores())
     print(MetricsHandler.return_hyper_scores())
     print(MetricsHandler.return_metrics())
-    print(MetricsHandler.return_todays())
+    print(MetricsHandler.return_today())
 
     history_data = MetricsHandler.return_pred_history()
     print("\n")

@@ -12,8 +12,6 @@ from bs4 import BeautifulSoup
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
-
-# from scripts.scrape import collect_sch_by_year, get_boxscore_data, clean_box_data
 from scripts.scraper import Scraper
 
 
@@ -32,11 +30,15 @@ class Updater:
         """
 
         req = requests.get(const.SCH_JSON_URL, headers=const.SCH_HEADER, timeout=60)
-        data = req.json().get("gs").get("g")
 
-        if not data:
-            print("No games scheduled today.")
-            sys.exit()
+        if req.status_code == 200:
+            data = req.json().get("gs").get("g")
+
+            if not data:
+                print("No games scheduled today.")
+                sys.exit()
+        else:
+            raise Exception(f"JSON Request: Status Code - {req.status_code} ")
 
         return data
 
@@ -249,21 +251,21 @@ class Updater:
 
         data["Game Time"] = data["Game Time"].str.split(" ").str[0]
 
-        data.columns = [
-            [
-                "Win%",
-                "Net",
-                "Massey",
-                "Odds",
-                "Away Team",
-                "Time",
-                "Home Name",
-                "Odds.1",
-                "Massey.1",
-                "Net.1",
-                "Win%.1",
-            ]
-        ]
+        # data.columns = [
+        #     [
+        #         "Win%",
+        #         "Net",
+        #         "Massey",
+        #         "Odds",
+        #         "Away Team",
+        #         "Time",
+        #         "Home Name",
+        #         "Odds.1",
+        #         "Massey.1",
+        #         "Net.1",
+        #         "Win%.1",
+        #     ]
+        # ]
 
         data.to_sql("today_preds", const.ENGINE, if_exists="replace", index=False)
 

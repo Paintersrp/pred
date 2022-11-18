@@ -47,22 +47,6 @@ class Predictor:
         self.y_test = None
         self.test_data = None
 
-    def save_model(self, model: xgb.Booster) -> None:
-        """
-        Saves current model
-        """
-
-        with open(f"{const.FILE_NAME}", "wb") as handle:
-            pickle.dump(model, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    def load_model(self) -> xgb.Booster:
-        """
-        Loads saved model
-        """
-
-        with open(f"{const.FILE_NAME}", "rb") as handle:
-            self.model = pickle.load(handle)
-
     def test_model(
         self,
         cv_count: int = 5,
@@ -169,6 +153,7 @@ class Predictor:
     def predict(
         self,
         random: bool = True,
+        loud: bool = False,
         year: int = 2022,
     ) -> pd.DataFrame:
         #  pylint: disable=too-many-arguments
@@ -233,9 +218,9 @@ class Predictor:
         for pred in preds:
             self.outcomes_arr.append(np.argmax(pred))
 
-        self.get_metrics(self.outcome_placeholder, self.outcomes_arr)
+        self.get_metrics(self.outcome_placeholder, self.outcomes_arr, loud)
 
-        return preds
+        return self.outcomes_arr
 
     def feature_scoring(self) -> pd.DataFrame:
         """
@@ -350,6 +335,22 @@ class Predictor:
         axis.set_xlabel("Recall")
         plt.legend(loc="best")
         plt.gcf().savefig("Precision_Recall_Curve.png", dpi=1200)
+
+    def save_model(self, model: xgb.Booster) -> None:
+        """
+        Saves current model
+        """
+
+        with open(f"{const.FILE_NAME}", "wb") as handle:
+            pickle.dump(model, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_model(self) -> xgb.Booster:
+        """
+        Loads saved model
+        """
+
+        with open(f"{const.FILE_NAME}", "rb") as handle:
+            self.model = pickle.load(handle)
 
 
 class DailyPredictor(Predictor):

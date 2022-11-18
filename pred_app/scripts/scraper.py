@@ -41,6 +41,7 @@ class Scraper:
         data["Date"] = pd.to_datetime(data["Date"])
 
         played = data[data["H-Pts"] != ""]
+        print(played["Date"])
         played = self.__set_extras(played)
 
         upcoming = data[data["H-Pts"] == ""]
@@ -57,16 +58,19 @@ class Scraper:
 
         first = True
 
-        for year in enumerate(range(start_year, end_year + 1)):
+        for year in range(start_year, end_year + 1):
             months = self.__map_months(year)
             games = self.__scrape_sch(year, months)
 
             if first:
                 data = pd.DataFrame(list(map(np.ravel, games)))
                 first = False
+
             else:
                 temp = pd.DataFrame(list(map(np.ravel, games)))
                 data = pd.concat([data, temp], axis=0, join="outer")
+
+        data = pd.DataFrame(data)
 
         if len(data.columns) == 10:
             data.drop(data.columns[[5, 7, 8, 9]], axis=1, inplace=True)
@@ -75,9 +79,13 @@ class Scraper:
 
         data.columns = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT"]
         data["OT"] = data["OT"].str.replace("Unnamed: 7", "")
+        data["Date"] = pd.to_datetime(data["Date"])
 
-        played = data[data["H-Pts"] != ""]
+        played = data[data["H-Pts"] != ""].reset_index(drop=True)
+        print(played["Date"])
         played = self.__set_extras(played)
+
+        played.to_sql("simulator_sch", const.ENGINE, if_exists="replace", index=False)
 
         upcoming = data[data["H-Pts"] == ""]
         upcoming.drop(upcoming.columns[[3, 5, 6]], axis=1, inplace=True)
@@ -158,7 +166,7 @@ class Scraper:
         averages = pd.DataFrame(list(map(np.ravel, final)))
 
         final = pd.concat([data, averages], axis=1, join="outer")
-        final.to_csv("BoxscoreData_2012.csv", index=None)
+        final.to_csv("BoxscoreData_2008.csv", index=None)
 
         return final
 
@@ -306,7 +314,7 @@ class Scraper:
             time.sleep(3)
             url = f"https://www.basketball-reference.com/leagues/NBA_{year}_games-{month}.html"
 
-            page = requests.get(url, timeout=60)
+            page = requests.get(url, headers=const.SCH_HEADER, timeout=60)
             soup = BeautifulSoup(page.text, "html.parser")
 
             table = soup.find(
@@ -338,19 +346,20 @@ class Scraper:
         Adds Season ID and MOV columns
         """
 
-        data["Date"] = pd.to_datetime(data["Date"])
-
         for i in data.index:
-            start_year = str(data.at[i, "Date"]).split("-")[0]
-            start_month = str(data.at[i, "Date"]).split("-")[1]
+            if i == 0:
+                print(type(data.at[i, "Date"]))
 
-            if int(start_month) <= 8:
-                start_year = str(int(start_year) - 1)
+            start_y = str(data.at[i, "Date"]).split("-")[0]
+            start_mon = str(data.at[i, "Date"]).split("-")[1]
 
-            end_year = list(str(int(start_year) + 1))
-            end_year = end_year[2] + end_year[3]
+            if int(start_mon) <= 8:
+                start_y = str(int(start_y) - 1)
 
-            data.at[i, "SeasonID"] = start_year + "-" + end_year
+            end_y = list(str(int(start_y) + 1))
+            end_y = end_y[2] + end_y[3]
+
+            data.at[i, "SeasonID"] = start_y + "-" + end_y
             data.at[i, "MOV"] = int(data.at[i, "H-Pts"]) - int(data.at[i, "A-Pts"])
 
         return data

@@ -237,6 +237,44 @@ conf_dict = {
     "Portland Trail Blazers": "West",
 }
 
+odds_team_dict = {
+    "Atlanta": "Atlanta Hawks",
+    "Boston": "Boston Celtics",
+    "Brooklyn": "Brooklyn Nets",
+    "Charlotte": "Charlotte Hornets",
+    "Chicago": "Chicago Bulls",
+    "Cleveland": "Cleveland Cavaliers",
+    "Dallas": "Dallas Mavericks",
+    "Denver": "Denver Nuggets",
+    "Detroit": "Detroit Pistons",
+    "GoldenState": "Golden State Warriors",
+    "Golden State": "Golden State Warriors",
+    "Houston": "Houston Rockets",
+    "Indiana": "Indiana Pacers",
+    "LAClippers": "Los Angeles Clippers",
+    "LA Clippers": "Los Angeles Clippers",
+    "LALakers": "Los Angeles Lakers",
+    "Memphis": "Memphis Grizzlies",
+    "Miami": "Miami Heat",
+    "Milwaukee": "Milwaukee Bucks",
+    "Minnesota": "Minnesota Timberwolves",
+    "NewJersey": "New Jersey Nets",
+    "NewOrleans": "New Orleans Pelicans",
+    "NewYork": "New York Knicks",
+    "OklahomaCity": "Oklahoma City Thunder",
+    "Oklahoma City": "Oklahoma City Thunder",
+    "Orlando": "Orlando Magic",
+    "Philadelphia": "Philadelphia 76ers",
+    "Phoenix": "Phoenix Suns",
+    "Portland": "Portland Trail Blazers",
+    "Sacramento": "Sacramento Kings",
+    "SanAntonio": "San Antonio Spurs",
+    "Seattle": "Seattle SuperSonics",
+    "Toronto": "Toronto Raptors",
+    "Utah": "Utah Jazz",
+    "Washington": "Washington Wizards",
+}
+
 
 """
 The below section contains parameter grids for testing hyperparameters

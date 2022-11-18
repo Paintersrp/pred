@@ -45,6 +45,18 @@ class Handler:
         schedule_data = pd.read_sql_table("upcoming_schedule_table", const.ENGINE)
         return schedule_data
 
+    def return_sim_data(self) -> pd.DataFrame:
+        """Returns data used for simulations"""
+
+        sim_data = pd.read_sql_table("simulator_data", const.ENGINE)
+        return sim_data
+
+    def return_current_odds_history(self) -> pd.DataFrame:
+        """Returns full game schedule and line stats (2008-2023)"""
+
+        data = pd.read_sql_table("current_odds_history", const.ENGINE)
+        return data
+
 
 class TeamsHandler(Handler):
     #  pylint: disable=too-many-instance-attributes
@@ -120,7 +132,7 @@ class TeamsHandler(Handler):
 
         self.data = pd.concat(raw_data).reset_index(drop=True)
 
-    def compare_teams_head_to_head(self, team_one: str, team_two: str):
+    def return_head_to_head(self, team_one: str, team_two: str):
         """
         Compares two teams head-to-head match up averages over last 5 meetings
         """
@@ -136,7 +148,7 @@ class TeamsHandler(Handler):
 
         self.data = pd.concat([t1_final, t2_final]).reset_index(drop=True)
 
-    def compare_team_avgs(self, home_team: str, away_team: str) -> pd.DataFrame:
+    def return_team_compare(self, home_team: str, away_team: str) -> None:
         """
         Builds table of two given team's current averages
         """
@@ -168,7 +180,7 @@ class TeamsHandler(Handler):
 
         return data
 
-    def build_compare_main(self, team_one: str, team_two: str) -> pd.DataFrame:
+    def return_compare_main(self, team_one: str, team_two: str) -> pd.DataFrame:
         """
         Loads odds stats and team stats from database
         Builds table of each teams combined team/odds stats
@@ -212,7 +224,7 @@ class TeamsHandler(Handler):
 
         return final_data
 
-    def current_averages(self) -> pd.DataFrame:
+    def return_current_averages(self) -> pd.DataFrame:
         """
         Builds table of all team's current averages
         """
@@ -234,12 +246,12 @@ class OddsHandler(Handler):
         self.data = pd.read_sql_table("odds_stats", const.ENGINE)
         self.grouped = self.data.groupby("Team")
 
-    def get_team(self, team_name) -> t.Any:
+    def return_team_averages(self, team_name) -> t.Any:
         """Returns given team's current odds stats"""
 
         return self.grouped.get_group(team_name)
 
-    def compare_teams(self, team_one: str, team_two: str):
+    def return_teams_compare(self, team_one: str, team_two: str):
         """Returns two given team's current odds stats for comparison"""
 
         t1_final = self.grouped.get_group(team_one)
@@ -258,7 +270,7 @@ class MetricsHandler(Handler):
     def __init__(self):
         super().__init__()
 
-    def return_todays(self) -> pd.DataFrame:
+    def return_today(self) -> pd.DataFrame:
         """Returns today' predictions table"""
 
         predictions = pd.read_sql_table("today_preds", const.ENGINE)
