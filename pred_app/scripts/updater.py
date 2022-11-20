@@ -13,6 +13,9 @@ from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
 from scripts.scraper import Scraper
+from scripts.handler import GeneralHandler
+
+DATAHANDLER = GeneralHandler()
 
 
 class Updater:
@@ -107,8 +110,7 @@ class Updater:
         Updates and returns current season massey ratings, grouped by Team Name
         """
 
-        played = pd.read_sql_table("2023_played_games", const.ENGINE)
-
+        played = DATAHANDLER.return_schedule_by_year(2023)
         raw_massey = current_massey(played, "2022-23")
         cur_massey = raw_massey.sort_index(axis=0, ascending=False)
         cur_massey = cur_massey.groupby("Name").head(1).reset_index(drop=True)
@@ -194,7 +196,8 @@ class Updater:
         pred_history_update = data[["Date", "A_Team", "A_Odds", "H_Team", "H_Odds"]]
 
         if features == const.NET_FULL_FEATURES:
-            old_pred_history = pd.read_sql_table("prediction_history_net", const.ENGINE)
+            # old_pred_history = pd.read_sql_table("prediction_history_net", const.ENGINE)
+            old_pred_history = DATAHANDLER.return_prediction_history()
 
             new_pred_history = pd.concat(
                 [pred_history_update, old_pred_history], axis=0, join="outer"
@@ -209,9 +212,11 @@ class Updater:
             )
 
         elif features == const.MASSEY_FULL_FEATURES:
-            old_pred_history = pd.read_sql_table(
-                "prediction_history_massey", const.ENGINE
-            )
+
+            # old_pred_history = pd.read_sql_table(
+            #     "prediction_history_massey", const.ENGINE
+            # )
+            old_pred_history = DATAHANDLER.return_prediction_history_massey()
 
             new_pred_history = pd.concat(
                 [pred_history_update, old_pred_history], axis=0, join="outer"
@@ -278,8 +283,12 @@ class Updater:
         Scrapes missing game data, committing to boxscore data
         """
 
-        box = pd.read_sql_table("boxscore_data", const.ENGINE)
-        played = pd.read_sql_table("2023_played_games", const.ENGINE)
+        # box = pd.read_sql_table("boxscore_data", const.ENGINE)
+        # played = pd.read_sql_table("2023_played_games", const.ENGINE)
+
+        box = DATAHANDLER.return_boxscore_data()
+        played = DATAHANDLER.return_schedule_by_year(2023)
+
         box["Date"] = pd.to_datetime(box["Date"]).dt.date
         played["Date"] = pd.to_datetime(played["Date"]).dt.date
 
@@ -349,8 +358,12 @@ class Updater:
         Combines daily team stat and massey rating updates for display
         """
 
-        massey = pd.read_sql_table("current_massey", const.ENGINE)
-        team = pd.read_sql_table("team_stats", const.ENGINE)
+        # massey = pd.read_sql_table("current_massey", const.ENGINE)
+        # team = pd.read_sql_table("team_stats", const.ENGINE)
+
+        massey = DATAHANDLER.return_current_massey()
+        team = DATAHANDLER.return_raw_team_stats()
+
         massey.sort_values("Name", ascending=True, inplace=True)
         massey.reset_index(drop=True, inplace=True)
 
@@ -407,10 +420,12 @@ class Updater:
 
         new_history = []
 
-        predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
+        # predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
+        predicted = DATAHANDLER.return_prediction_history()
         predicted["Actual"] = "TBD"
 
-        played = pd.read_sql_table("2023_played_games", const.ENGINE)
+        # played = pd.read_sql_table("2023_played_games", const.ENGINE)
+        played = DATAHANDLER.return_schedule_by_year(2023)
 
         played["Away"] = np.where(
             played["Away"] == "Los Angeles Clippers", "LA Clippers", played["Away"]
@@ -454,7 +469,8 @@ class Updater:
 
         new_history = pd.concat(new_history, axis=0, join="outer")
 
-        previous_history = pd.read_sql_table("prediction_scoring", const.ENGINE)
+        # previous_history = pd.read_sql_table("prediction_scoring", const.ENGINE)
+        previous_history = DATAHANDLER.return_pred_scoring()
 
         combined = pd.concat([previous_history, new_history], axis=0, join="outer")
 
@@ -471,7 +487,8 @@ class Updater:
         Updates upcoming schedule of unplayed games data
         """
 
-        upcoming_games = pd.read_sql_table("2023_upcoming_games", const.ENGINE)
+        # upcoming_games = pd.read_sql_table("2023_upcoming_games", const.ENGINE)
+        upcoming_games = DATAHANDLER.return_upcoming_schedule_by_year(2023)
         today_mask = upcoming_games["Date"] != str(date.today())
         upcoming_games = upcoming_games.loc[today_mask].reset_index(drop=True)
         upcoming_games.to_sql(

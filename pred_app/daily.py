@@ -10,6 +10,7 @@ from scripts.handler import MetricsHandler
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
+
     Updater = Updater()
     DailyPredictor = DailyPredictor()
 

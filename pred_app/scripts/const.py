@@ -4,12 +4,9 @@ from xgboost.sklearn import XGBClassifier
 
 """ SQLAlchemy Database Engine """
 
-
 ENGINE = create_engine("sqlite:///pred.db")
 
-
 """ Headers and URL for retrieving daily schedule """
-
 
 SCH_HEADER = {
     "user-agent": "Mozilla/5.0 (Windows NT 6.2; WOW64)"
@@ -23,20 +20,16 @@ YEAR = "20" + date.today().strftime("%y")
 SCH_JSON_URL = f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{YEAR}/scores/00_todays_scores.json"  # pylint: disable=line-too-long
 ODDS_UPDATE_URL = f"https://sportsbookreviewsonline.com/scoresoddsarchives/nba/nba%20odds%202022-23.xlsx"
 
-
 """ Curent epoch settings for model """
-
 
 NET_EPOCHS = 918
 MASSEY_EPOCHS = 5000
 DEF_CLASSIFIER = XGBClassifier(num_class=2)
 FILE_NAME = "model.pk"
 
-
 """
 Below section contains const lists of months used for a given year
 """
-
 
 MONTHS_1999 = ["february", "march", "april", "may", "june"]
 MONTHS_2012 = ["december", "january", "february", "march", "april", "may", "june"]
@@ -88,11 +81,9 @@ MONTHS_NO_OCT = [
     "june",
 ]
 
-
 """
 List of various feature sets used for model
 """
-
 
 NET_FULL = [
     "W_PCT",
@@ -150,11 +141,16 @@ MASSEY_TRUNC_FEATURES = ["A_" + item for item in NET_TRUNC + ["Massey"]] + [
     "H_" + item for item in NET_TRUNC + ["Massey"]
 ]
 
+SIM_PRED_FEATURES = NET_FULL_FEATURES + ["O/U", "H_ML", "A_ML", "Spread"]
+SIM_PRED_DISPLAY_FEATURES = (
+    ["Date", "Away", "Home", "SeasonID", "MOV", "Outcome"]
+    + NET_FULL_FEATURES
+    + ["Pred", "O/U", "H_ML", "A_ML", "Spread"]
+)
 
 """
 add notes
 """
-
 
 TABLE_STATS_FULL = [
     "Team",
@@ -187,11 +183,9 @@ TABLE_STATS_FULL = [
     "PIE",
 ]
 
-
 """
 Features/Columns for Scraping/Transforming Boxscore Data
 """
-
 
 BASIC = [
     "FG",
@@ -287,16 +281,12 @@ COMPARE_COLS = [
 
 ODDS_COLS = ["Team", "Fav_W%", "UD_W%", "Cover%", "Under%", "Over%", "Def_W%", "Off_W%"]
 
-
 """ Constants used in ELO Calculations """
-
 
 MEAN_ELO = 1500
 ELO_WIDTH = 400
 K_FACTOR = 64
 
-
 """ Constant feature sets used by Simulator  """
-
 
 SIM_FEATURES = ["Date", "Away", "Home", "SeasonID", "MOV", "Outcome", "Pred."]

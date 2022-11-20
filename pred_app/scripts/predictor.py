@@ -18,7 +18,7 @@ from sklearn.metrics import (
 )
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from scripts import const, dicts, utils
+from scripts import const, dicts, utils, handler
 
 
 """
@@ -27,6 +27,8 @@ train_data = train_data.loc[mask].reset_index(drop=True)
 outcomes = train_data["Outcome"]
 massey_data = train_data[const.MASSEY_FULL_FEATURES]
 """
+
+DATAHANDLER = handler.GeneralHandler()
 
 
 class Predictor:
@@ -38,7 +40,7 @@ class Predictor:
     """
 
     def __init__(self):
-        self.train_data = pd.read_sql_table("training_data", const.ENGINE)
+        self.train_data = DATAHANDLER.return_training_data()
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data[const.NET_FULL_FEATURES]
         self.model = None
@@ -46,6 +48,18 @@ class Predictor:
         self.outcome_placeholder = None
         self.y_test = None
         self.test_data = None
+        self.unfiltered_test_data = None
+        self.sim_mode = False
+
+    def enable_sim_mode(self) -> None:
+        """
+        Sets the training data to data filtered to games with odds history attached
+        """
+
+        self.train_data = DATAHANDLER.return_sim_pred_data()
+        self.outcomes = self.train_data["Outcome"]
+        self.net_data = self.train_data
+        self.sim_mode = True
 
     def test_model(
         self,
@@ -202,6 +216,11 @@ class Predictor:
             )
             self.outcomes = self.net_data["Outcome"]
             self.outcome_placeholder = self.test_data["Outcome"]
+
+        if self.sim_mode:
+            self.unfiltered_test_data = self.test_data
+            self.test_data = self.test_data[const.SIM_PRED_FEATURES]
+            self.net_data = self.net_data[const.SIM_PRED_FEATURES]
 
         self.outcomes_arr = []
 

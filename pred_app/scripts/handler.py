@@ -16,46 +16,113 @@ class Handler:
     """
 
     def __init__(self):
-        self.data = pd.read_sql_table("boxscore_data", const.ENGINE)
+        self.data = None
+        self.loaded = None
+
+    def load_data(self, data):
+        """Loads data for extra processing"""
+
+        self.data = data
+        self.loaded = data
 
     def print_data(self):
-        """Prints most currently loaded data"""
+        """Prints currently loaded data"""
 
         print(self.data)
 
     def return_data(self) -> pd.DataFrame:
-        """Returns most currently loaded data"""
+        """Returns currently loaded data"""
 
         return self.data
 
     def reset_filter(self):
         """Resets data to unfiltered state"""
 
-        self.data = pd.read_sql_table("boxscore_data", const.ENGINE)
+        self.data = self.loaded
 
-    def print_schedule(self):
-        """Prints most up-to-date upcoming schedule"""
 
-        schedule_data = pd.read_sql_table("upcoming_schedule_table", const.ENGINE)
-        print(schedule_data)
+class GeneralHandler(Handler):
+    """
+    Class
+    """
+
+    def __init__(self):
+        super().__init__()
 
     def return_schedule(self) -> pd.DataFrame:
         """Returns most up-to-date upcoming schedule"""
 
-        schedule_data = pd.read_sql_table("upcoming_schedule_table", const.ENGINE)
-        return schedule_data
+        return pd.read_sql_table("upcoming_schedule_table", const.ENGINE)
 
     def return_sim_data(self) -> pd.DataFrame:
-        """Returns data used for simulations"""
+        """Returns data used for general simulations"""
 
-        sim_data = pd.read_sql_table("simulator_data", const.ENGINE)
-        return sim_data
+        return pd.read_sql_table("simulator_data", const.ENGINE)
+
+    def return_sim_pred_data(self) -> pd.DataFrame:
+        """Returns data used for prediction based simulations"""
+
+        return pd.read_sql_table("sim_pred_data", const.ENGINE)
 
     def return_current_odds_history(self) -> pd.DataFrame:
-        """Returns full game schedule and line stats (2008-2023)"""
+        """Returns current season game line stats (2023)"""
 
-        data = pd.read_sql_table("current_odds_history", const.ENGINE)
-        return data
+        return pd.read_sql_table("current_odds_history", const.ENGINE)
+
+    def return_full_odds_history(self) -> pd.DataFrame:
+        """Returns full game line stats (2008-2023)"""
+
+        return pd.read_sql_table("full_odds_history", const.ENGINE)
+
+    def return_training_data(self) -> pd.DataFrame:
+        """Returns full model training data"""
+
+        return pd.read_sql_table("training_data", const.ENGINE)
+
+    def return_prediction_history(self) -> pd.DataFrame:
+        """Returns prediction history of Net focused model"""
+
+        return pd.read_sql_table("prediction_history_net", const.ENGINE)
+
+    def return_prediction_history_massey(self) -> pd.DataFrame:
+        """Returns prediction history of Massey focused model"""
+
+        return pd.read_sql_table("prediction_history_massey", const.ENGINE)
+
+    def return_schedule_by_year(self, year) -> pd.DataFrame:
+        """Returns schedule of completed games for given year"""
+
+        return pd.read_sql_table(f"{year}_played_games", const.ENGINE)
+
+    def return_upcoming_schedule_by_year(self, year) -> pd.DataFrame:
+        """Returns schedule of upcoming games for given year"""
+
+        return pd.read_sql_table(f"{year}_upcoming_games", const.ENGINE)
+
+    def return_boxscore_data(self) -> pd.DataFrame:
+        """Returns full boxscore dataset"""
+
+        return pd.read_sql_table("boxscore_data", const.ENGINE)
+
+    def return_raw_team_stats(self) -> pd.DataFrame:
+        """Returns current team stats without additions"""
+
+        return pd.read_sql_table("team_stats", const.ENGINE)
+
+    def return_current_massey(self) -> pd.DataFrame:
+        """Returns current massey ratings for each team"""
+
+        return pd.read_sql_table("current_massey", const.ENGINE)
+
+    def return_current_team_stats(self) -> pd.DataFrame:
+        """Returns current team stats with additions"""
+
+        return pd.read_sql_table("all_stats", const.ENGINE)
+
+    def return_pred_scoring(self) -> pd.DataFrame:
+        """Returns full prediction historical data"""
+
+        return pd.read_sql_table("prediction_scoring", const.ENGINE)
 
 
 class TeamsHandler(Handler):
@@ -68,7 +135,6 @@ class TeamsHandler(Handler):
 
     def __init__(self):
         super().__init__()
-        self.data = pd.read_sql_table("boxscore_data", const.ENGINE)
 
     def __map_season(self, year: int) -> list:
         """Maps given year to SeasonID of given year"""
@@ -224,15 +290,6 @@ class TeamsHandler(Handler):
 
         return final_data
 
-    def return_current_averages(self) -> pd.DataFrame:
-        """
-        Builds table of all team's current averages
-        """
-
-        all_stats = pd.read_sql_table("all_stats", const.ENGINE)
-
-        return all_stats
-
 
 class OddsHandler(Handler):
     """
@@ -273,32 +330,37 @@ class MetricsHandler(Handler):
     def return_today(self) -> pd.DataFrame:
         """Returns today' predictions table"""
 
-        predictions = pd.read_sql_table("today_preds", const.ENGINE)
-        return predictions
+        return pd.read_sql_table("today_preds", const.ENGINE)
 
     def return_metrics(self) -> pd.DataFrame:
         """Returns today's metrics table"""
 
-        metrics_data = pd.read_sql_table("metric_scores", const.ENGINE)
-        return metrics_data
+        return pd.read_sql_table("metric_scores", const.ENGINE)
 
     def return_pred_history(self) -> pd.DataFrame:
         """Returns full prediction historical data"""
 
-        pred_history = pd.read_sql_table("prediction_scoring", const.ENGINE)
-        return pred_history
+        return pd.read_sql_table("prediction_scoring", const.ENGINE)
+
+    def return_current_odds_history(self) -> pd.DataFrame:
+        """Returns current season game line stats (2023)"""
+
+        return pd.read_sql_table("current_odds_history", const.ENGINE)
 
     def return_feature_scores(self) -> pd.DataFrame:
         """Returns today's feature scoring table"""
 
-        feature_scores = pd.read_sql_table("feature_scores", const.ENGINE)
-        return feature_scores
+        return pd.read_sql_table("feature_scores", const.ENGINE)
 
     def return_hyper_scores(self) -> pd.DataFrame:
         """Returns most recent hyperparameter scoring table"""
 
-        hyper_scores = pd.read_sql_table("hyper_scores", const.ENGINE)
-        return hyper_scores
+        return pd.read_sql_table("hyper_scores", const.ENGINE)
+
+    def return_sim_data(self) -> pd.DataFrame:
+        """Returns data used for general simulations"""
+
+        return pd.read_sql_table("simulator_data", const.ENGINE)
 
     def show_recall_plot(self) -> None:
         """Returns today's Precision Recall Curve plot"""

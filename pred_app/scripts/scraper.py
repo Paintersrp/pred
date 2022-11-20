@@ -18,7 +18,7 @@ class Scraper:
     """
 
     def __init__(self):
-        self.train_data = pd.read_sql_table("training_data", const.ENGINE)
+        pass
 
     def get_sch_by_year(self, year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -41,7 +41,6 @@ class Scraper:
         data["Date"] = pd.to_datetime(data["Date"])
 
         played = data[data["H-Pts"] != ""]
-        print(played["Date"])
         played = self.__set_extras(played)
 
         upcoming = data[data["H-Pts"] == ""]
@@ -82,7 +81,6 @@ class Scraper:
         data["Date"] = pd.to_datetime(data["Date"])
 
         played = data[data["H-Pts"] != ""].reset_index(drop=True)
-        print(played["Date"])
         played = self.__set_extras(played)
 
         played.to_sql("simulator_sch", const.ENGINE, if_exists="replace", index=False)
@@ -95,7 +93,6 @@ class Scraper:
     def get_boxscore_data_from_sch(
         self,
         data: pd.DataFrame,
-        from_csv: bool = False,
     ) -> pd.DataFrame:
         """
         Retrieves boxscore data for every game in a given schedule
@@ -111,21 +108,11 @@ class Scraper:
             else:
                 data.at[i, "Outcome"] = 0
 
-            if not from_csv:
-                date_split = str(data.at[i, "Date"]).split(" ")
-                date_split = date_split[0].split("-")
-                month_num = date_split[1]
-                year_num = date_split[0]
-                day_num = date_split[2].replace(",", "")
-
-            else:
-                date_split = data.at[i, "Date"].split(" ")
-                month_num = dicts.month_dict[date_split[1]]
-                year_num = date_split[3]
-                day_num = date_split[2].replace(",", "")
-
-                if 1 <= int(day_num) <= 9:
-                    day_num = f"0{day_num}"  #  Adds leading zero to digits under 10. (9 -> 09)
+            date_split = str(data.at[i, "Date"]).split(" ")
+            date_split = date_split[0].split("-")
+            month_num = date_split[1]
+            year_num = date_split[0]
+            day_num = date_split[2].replace(",", "")
 
             team_abr = dicts.team_dict[data.at[i, "Home"]]
             ot_check = data.at[i, "OT"]
@@ -347,9 +334,6 @@ class Scraper:
         """
 
         for i in data.index:
-            if i == 0:
-                print(type(data.at[i, "Date"]))
-
             start_y = str(data.at[i, "Date"]).split("-")[0]
             start_mon = str(data.at[i, "Date"]).split("-")[1]
 
