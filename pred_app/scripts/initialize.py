@@ -1,10 +1,10 @@
 """
 This script contains data cleaning/transforming/amending functions
 """
+from datetime import date
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from datetime import date
 from scripts import utils, const, handler
 from scripts.ratings import get_massey, adjust_elo, update_elo_new_season
 
@@ -51,6 +51,7 @@ def commit_sch() -> None:
 
 
 def set_extras(data: pd.DataFrame) -> pd.DataFrame:
+    #  pylint: disable=use-maxsplit-arg
     """
     Adds Season ID and MOV columns
     """
@@ -92,6 +93,7 @@ def clean_train(data) -> pd.DataFrame:
 
 
 def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
+    #  pylint: disable=too-many-locals
     """
     Calculates Massey Ratings for all seasons in Training File
     Concats Massey Ratings to provided file (usually schedule or raw stats)
@@ -234,7 +236,7 @@ def combine_odds_dataset() -> pd.DataFrame:
     https://www.sportsbookreviewsonline.com/scoresoddsarchives/nba/nbaoddsarchives.htm
     """
 
-    sets = (
+    datasets = (
         pd.read_excel("nba odds 2007-08.xlsx"),
         pd.read_excel("nba odds 2008-09.xlsx"),
         pd.read_excel("nba odds 2009-10.xlsx"),
@@ -254,16 +256,16 @@ def combine_odds_dataset() -> pd.DataFrame:
 
     year_range = range(2008, 2023)
 
-    for set, year in zip(sets, year_range):
-        set["Open"] = np.where(set["Open"] == "pk", 0, set["Open"])
-        set["Open"] = np.where(set["Open"] == "PK", 0, set["Open"])
-        set["Close"] = np.where(set["Close"] == "pk", 0, set["Close"])
-        set["ML"] = np.where(set["ML"] == "NL", 0, set["ML"])
-        set["Open"] = set["Open"].astype(int)
-        set["Close"] = set["Open"].astype(int)
+    for dataset, year in zip(datasets, year_range):
+        dataset["Open"] = np.where(dataset["Open"] == "pk", 0, dataset["Open"])
+        dataset["Open"] = np.where(dataset["Open"] == "PK", 0, dataset["Open"])
+        dataset["Close"] = np.where(dataset["Close"] == "pk", 0, dataset["Close"])
+        dataset["ML"] = np.where(dataset["ML"] == "NL", 0, dataset["ML"])
+        dataset["Open"] = dataset["Open"].astype(int)
+        dataset["Close"] = dataset["Open"].astype(int)
 
-        for i in set["Date"].index:
-            test = [x for x in str(set.at[i, "Date"])]
+        for i in dataset["Date"].index:
+            test = list(str(dataset.at[i, "Date"]))
 
             if len(test) == 4:
                 month_check = test[0] + test[1]
@@ -273,11 +275,13 @@ def combine_odds_dataset() -> pd.DataFrame:
                 day_check = test[1] + test[2]
 
             if int(month_check) > 9:
-                set.at[i, "Date"] = f"{year-1}" + "-" + month_check + "-" + day_check
+                dataset.at[i, "Date"] = (
+                    f"{year-1}" + "-" + month_check + "-" + day_check
+                )
             else:
-                set.at[i, "Date"] = f"{year}" + "-" + month_check + "-" + day_check
+                dataset.at[i, "Date"] = f"{year}" + "-" + month_check + "-" + day_check
 
-    data = pd.concat(sets, axis=0, join="outer").reset_index(drop=True)
+    data = pd.concat(datasets, axis=0, join="outer").reset_index(drop=True)
 
     return data
 
@@ -512,9 +516,9 @@ def initial_sim_pred():
     Func
     """
 
-    h = handler.GeneralHandler()
-    training_data = h.return_training_data()
-    odds_history = h.return_full_odds_history()
+    data_handler = handler.GeneralHandler()
+    training_data = data_handler.return_training_data()
+    odds_history = data_handler.return_full_odds_history()
 
     training_data["Date"] = pd.to_datetime(training_data["Date"])
     odds_history["Date"] = pd.to_datetime(odds_history["Date"])
@@ -543,6 +547,62 @@ def initial_sim_pred():
     training_data.to_sql(
         "sim_pred_data", const.ENGINE, if_exists="replace", index=False
     )
+
+
+def build_sim_random_data(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Yar
+    """
+
+    sch_data = pd.read_sql_table("simulator_sch", const.ENGINE)
+
+    num_r = len(sch_data) - len(data)
+    np.random.seed(10)
+    drop_indices = np.random.choice(sch_data.index, num_r, replace=False)
+    sch_data = sch_data.drop(drop_indices).reset_index(drop=True)
+
+    sch_data["H-Pts"] = sch_data["H-Pts"].astype(int)
+    final_data = pd.concat([sch_data, data], axis=1, join="outer")
+    final_data["ML_Payout"] = np.where(
+        final_data["MOV"] > 0, final_data["H_ML"], final_data["A_ML"]
+    )
+
+    rearrange = [col for col in final_data.columns if col != "H_ML"] + ["H_ML"]
+    final_data = final_data[rearrange]
+
+    return final_data
+
+
+def initialize_boxscore_data() -> None:
+    """
+    Func
+    """
+
+    datasets = (
+        pd.read_csv("BoxscoreData_2008.csv"),
+        pd.read_csv("BoxscoreData_2009.csv"),
+        pd.read_csv("BoxscoreData_2010.csv"),
+        pd.read_csv("BoxscoreData_2011.csv"),
+        pd.read_csv("BoxscoreData_2012.csv"),
+        pd.read_csv("BoxscoreData_2013.csv"),
+        pd.read_csv("BoxscoreData_2014.csv"),
+        pd.read_csv("BoxscoreData_2015.csv"),
+        pd.read_csv("BoxscoreData_2016.csv"),
+        pd.read_csv("BoxscoreData_2017.csv"),
+        pd.read_csv("BoxscoreData_2018.csv"),
+        pd.read_csv("BoxscoreData_2019.csv"),
+        pd.read_csv("BoxscoreData_2020.csv"),
+        pd.read_csv("BoxscoreData_2021.csv"),
+        pd.read_csv("BoxscoreData_2022.csv"),
+    )
+
+    final = pd.concat(datasets, axis=0, join="outer").reset_index(drop=True)
+    final.columns = final.columns
+    final = final.drop(final.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
+    final.columns = const.BOX_FEATURES
+    final.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
+
+    return final
 
 
 if __name__ == "__main__":

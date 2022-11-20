@@ -5,7 +5,7 @@ from datetime import date
 import typing as t
 import pandas as pd
 import numpy as np
-from scripts import const, dicts
+from scripts import const
 
 
 def adjust_elo(a_elo: float, h_elo: float, outcome: int) -> tuple[float, float]:

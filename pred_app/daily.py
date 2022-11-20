@@ -42,6 +42,8 @@ if __name__ == "__main__":
     Updater.update_upcoming()
     Updater.update_injuries()
     Updater.update_boxscore_data()
+    Updater.update_odds_current()
+    Updater.update_odds_full()
 
     #  MetricsHandler handles returns/prints of Model Metric Data
 

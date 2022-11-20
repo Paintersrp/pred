@@ -14,8 +14,10 @@ from scripts import const, dicts
 from scripts.ratings import current_massey
 from scripts.scraper import Scraper
 from scripts.handler import GeneralHandler
+from scripts.initialize import clean_odds_data
 
 DATAHANDLER = GeneralHandler()
+SCRAPER = Scraper()
 
 
 class Updater:
@@ -25,7 +27,6 @@ class Updater:
 
     def __init__(self):
         self.metrics_table = None
-        self.Scraper = Scraper()
 
     def update_games_json(self) -> t.Any:
         """
@@ -95,7 +96,7 @@ class Updater:
         Updates schedule of played and upcoming games
         """
 
-        played, upcoming = self.Scraper.get_sch_by_year(2023)
+        played, upcoming = SCRAPER.get_sch_by_year(2023)
 
         played.to_sql(
             "2023_played_games", const.ENGINE, if_exists="replace", index=False
@@ -308,8 +309,8 @@ class Updater:
             mask = played["Date"] >= update_check[0]
             games_to_update = played.loc[mask].reset_index(drop=True)
 
-            new_data = self.Scraper.get_boxscore_data_from_sch(games_to_update)
-            new_data = self.Scraper.clean_boxscore_data(new_data)
+            new_data = SCRAPER.get_boxscore_data_from_sch(games_to_update)
+            new_data = SCRAPER.clean_boxscore_data(new_data)
             new_box = pd.concat([box, new_data], axis=0, join="outer").reset_index(
                 drop=True
             )
@@ -334,15 +335,14 @@ class Updater:
         soup = BeautifulSoup(page.text, "html.parser")
 
         team_names = soup.find_all(name="div", attrs={"class": "lineup__abbr"})
-
         unordered_lists = soup.find_all(name="ul", attrs={"class": "lineup__list"})
 
         injury_dict = defaultdict(list)
 
-        for i, ul in enumerate(unordered_lists):
-            for li in ul.find_all("li"):
-                player_name = li.find("a")
-                status = li.find("span")
+        for i, lineup_list in enumerate(unordered_lists):
+            for detail in lineup_list.find_all("li"):
+                player_name = detail.find("a")
+                status = detail.find("span")
 
                 if player_name is not None and status is not None:
                     injury_dict[team_names[i].text].append(
@@ -509,4 +509,55 @@ class Updater:
 
         hyper_scores.to_sql(
             "hyper_scores", const.ENGINE, if_exists="replace", index=False
+        )
+
+    def update_odds_full(self) -> None:
+        """
+        Yar
+        """
+
+        old_odd_history = pd.read_sql_table("full_odds_history", const.ENGINE)
+        new_odd_history = pd.read_sql_table("current_odds_history", const.ENGINE)
+
+        new_odd_history = pd.concat(
+            [old_odd_history, new_odd_history], axis=0, join="outer"
+        ).reset_index(drop=True)
+        new_odd_history.drop_duplicates(
+            subset=["Date", "H_Team"], keep="first", inplace=True
+        )
+        new_odd_history.to_sql(
+            "full_odds_history", const.ENGINE, if_exists="replace", index=False
+        )
+
+    def update_odds_current(self) -> None:
+        """
+        Yar
+        """
+
+        data = pd.read_excel(const.ODDS_UPDATE_URL)
+        data["Open"] = np.where(data["Open"] == "pk", 0, data["Open"])
+        data["Open"] = np.where(data["Open"] == "PK", 0, data["Open"])
+        data["Close"] = np.where(data["Close"] == "pk", 0, data["Close"])
+        data["ML"] = np.where(data["ML"] == "NL", 0, data["ML"])
+        data["Open"] = data["Open"].astype(int)
+        data["Close"] = data["Open"].astype(int)
+
+        for i in data["Date"].index:
+            date_check = list(str(data.at[i, "Date"]))
+
+            if len(date_check) == 4:
+                month_check = date_check[0] + date_check[1]
+                day_check = date_check[2] + date_check[3]
+            else:
+                month_check = date_check[0]
+                day_check = date_check[1] + date_check[2]
+
+            if int(month_check) > 9:
+                data.at[i, "Date"] = f"{2023-1}" + "-" + month_check + "-" + day_check
+            else:
+                data.at[i, "Date"] = f"{2023}" + "-" + month_check + "-" + day_check
+
+        data = clean_odds_data(data)
+        data.to_sql(
+            "current_odds_history", const.ENGINE, if_exists="replace", index=False
         )

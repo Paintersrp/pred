@@ -1,11 +1,9 @@
 """
 WIP
 """
+import pickle
 import pandas as pd
 import numpy as np
-import pickle
-import json
-import typing as t
 from scripts import const
 from scripts import predictor
 from scripts import handler
@@ -17,12 +15,12 @@ class Simulator:
     """
 
     def __init__(self, bet_value: float) -> None:
-        if type(bet_value) == str or bet_value <= 0:
+        if isinstance(bet_value, str) or bet_value <= 0:
             raise ValueError(
                 f"Bet Value must not be negative, 0, or a string. Bet Value Received: {bet_value}"
             )
 
-        self.Handler = handler.MetricsHandler()
+        self.data_handler = handler.MetricsHandler()
         self.bet_value = bet_value
         self.data = self.__prepare_data()
 
@@ -36,8 +34,8 @@ class Simulator:
         Func
         """
 
-        pred_history_data = self.Handler.return_pred_history()
-        current_data = self.Handler.return_current_odds_history()
+        pred_history_data = self.data_handler.return_pred_history()
+        current_data = self.data_handler.return_current_odds_history()
         pred_history_data = pred_history_data.rename(columns={"Outcome": "Bet_Status"})
 
         filter_check = list(current_data["Date"].unique())
@@ -150,7 +148,7 @@ class Simulator:
         """
         Func
         """
-        if type(bet_value) == str or bet_value <= 0:
+        if isinstance(bet_value, str) or bet_value <= 0:
             raise ValueError(
                 f"Bet Value must not be negative, 0, or a string. Bet Value Received: {bet_value}"
             )
@@ -179,22 +177,18 @@ class Simulator:
         Func
         """
 
-        try:
-            with open(f"{file_name}.pkl", "wb") as f:
-                pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
-        except Exception as ex:
-            print("Error:", ex)
+        with open(f"{file_name}.pkl", "wb") as writer:
+            pickle.dump(self, writer, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_sim(self, file_name: str) -> object:
         """
         Func
         """
 
-        try:
-            with open(f"{file_name}.pkl", "rb") as f:
-                return pickle.load(f)
-        except Exception as ex:
-            print("Error:", ex)
+        with open(f"{file_name}.pkl", "rb") as writer:
+            data = pickle.load(writer)
+
+        return data
 
 
 class SimRandom(Simulator):
@@ -216,7 +210,7 @@ class SimRandom(Simulator):
         Func
         """
 
-        sim_data = self.Handler.return_sim_data()
+        sim_data = self.data_handler.return_sim_data()
         sim_data = sim_data.sample(self.num_games).reset_index(drop=True)
         faux_outcomes = np.random.binomial(1, self.win_rate, sim_data.shape[0])
         sim_data["Bet_Status"] = faux_outcomes
@@ -260,7 +254,7 @@ class SimRandom(Simulator):
         Func
         """
 
-        if type(win_rate) == str or win_rate <= 0:
+        if isinstance(win_rate, str) or win_rate <= 0:
             raise ValueError(
                 f"Win Rate must not be negative, 0, or a string. Win Rate Received: {win_rate}"
             )
@@ -270,12 +264,12 @@ class SimRandom(Simulator):
                 f"Win Rate must be between 0.01 and 0.99. Win Rate Received: {win_rate}"
             )
 
-        if type(num_games) == str or num_games <= 0:
+        if isinstance(num_games, str) or num_games <= 0:
             raise ValueError(
-                f"Number of Games must not be negative, 0, or a string. Number of Games Received: {num_games}"
+                f"Number of Games must not be negative, 0, or a string. Number of Games Received: {num_games}"  #  pylint: disable=line-too-long
             )
 
-        if type(num_games) == float:
+        if isinstance(num_games, float):
             raise ValueError(
                 f"Number of Games must be a whole number. Number of Games Received: {num_games}"
             )
@@ -291,7 +285,7 @@ class SimPredictor(Simulator):
         self.__check_parameters(random, year)
 
         self.year = year
-        self.Predictor = predictor.Predictor()
+        self.sim_predictor = predictor.Predictor()
         self.reroll(random, self.year)
 
     def reroll(self, random: bool, year: int = 2022) -> pd.DataFrame:
@@ -300,15 +294,15 @@ class SimPredictor(Simulator):
         """
 
         self.__check_parameters(random, year)
-        self.Predictor.enable_sim_mode()
+        self.sim_predictor.enable_sim_mode()
 
         if random:
-            self.predictions = self.Predictor.predict(True, True, None)
+            self.predictions = self.sim_predictor.predict(True, True, None)
         else:
-            self.predictions = self.Predictor.predict(False, True, year)
+            self.predictions = self.sim_predictor.predict(False, True, year)
 
         self.predictions = pd.DataFrame(self.predictions, columns=["Pred"])
-        self.test_data = self.Predictor.unfiltered_test_data.reset_index(drop=True)
+        self.test_data = self.sim_predictor.unfiltered_test_data.reset_index(drop=True)
         self.test_data["Pred."] = self.predictions
         self.test_data = pd.concat(
             [self.test_data, self.predictions], axis=1, join="outer"
@@ -352,27 +346,27 @@ class SimPredictor(Simulator):
         Func
         """
 
-        if type(random) == str:
+        if isinstance(random, str):
             raise ValueError(
                 f"Random state should not be a string. Type Received: {type(random)}"
             )
 
-        if not type(random) == bool:
+        if not isinstance(random, bool):
             raise ValueError(
                 f"Random state must be True or False. State Received: {random}"
             )
 
-        if type(year) == str:
+        if isinstance(year, str):
             raise ValueError(
                 f"Year should not be a string. Type Received: {type(year)}"
             )
 
-        if type(year) == str or year <= 0:
+        if isinstance(year, str) or year <= 0:
             raise ValueError(
                 f"Year must not be negative, 0, or a string. Year Received: {year}"
             )
 
-        if type(year) == float:
+        if isinstance(year, float) == float:
             raise ValueError(f"Year must be a whole number. Year Received: {year}")
 
 
@@ -380,6 +374,11 @@ class SimPredictor(Simulator):
 # lean in = add bet value for 85-100%
 # lean out = lower bet value for 55-65%
 class SimAdvanced(Simulator):
+    #  pylint: disable=too-many-instance-attributes
+    """
+    Class
+    """
+
     def __init__(
         self,
         bet_value: float,
@@ -404,8 +403,8 @@ class SimAdvanced(Simulator):
         Func
         """
 
-        Handler = handler.MetricsHandler()
-        prep_data = Handler.return_pred_history()
+        data_handler = handler.MetricsHandler()
+        prep_data = data_handler.return_pred_history()
 
         prep_data = prep_data.rename(columns={"Outcome": "Bet_Status"})
 
@@ -454,31 +453,31 @@ class SimAdvanced(Simulator):
 
         return prep_data
 
-    def adjust_bet_skip_range(self, min, max) -> None:
+    def adjust_bet_skip_range(self, minimum, maximum) -> None:
         """
         Func
         """
 
-        self.bet_skip_min = min
-        self.bet_skip_max = max
+        self.bet_skip_min = minimum
+        self.bet_skip_max = maximum
         # self.__prepare_data()
 
-    def adjust_lean_in_range(self, min, max) -> None:
+    def adjust_lean_in_range(self, minimum, maximum) -> None:
         """
         Func
         """
 
-        self.lean_in_min = min
-        self.lean_in_max = max
+        self.lean_in_min = minimum
+        self.lean_in_max = maximum
         # self.__prepare_data()
 
-    def adjust_lean_out_range(self, min, max) -> None:
+    def adjust_lean_out_range(self, minimum, maximum) -> None:
         """
         Func
         """
 
-        self.lean_out_min = min
-        self.lean_out_max = max
+        self.lean_out_min = minimum
+        self.lean_out_max = maximum
         # self.__prepare_data()
 
     def test_bet_skip(self) -> None:
@@ -496,7 +495,7 @@ class SimAdvanced(Simulator):
         """
 
         #   lean in filtered test - use handler to get all games with 85-100% for one team
-        #       calculate win%, # of losses, earned/lost ratio, profit with, profit without, loss with, etc
+        #       calculate win%, # of losses, earned/lost ratio, profit with, profit without, loss with, etc         #  pylint: disable=line-too-long
 
         pass
 
