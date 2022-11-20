@@ -517,8 +517,8 @@ def initial_sim_pred():
     """
 
     data_handler = handler.GeneralHandler()
-    training_data = data_handler.return_training_data()
-    odds_history = data_handler.return_full_odds_history()
+    training_data = data_handler.training_data()
+    odds_history = data_handler.full_odds_history()
 
     training_data["Date"] = pd.to_datetime(training_data["Date"])
     odds_history["Date"] = pd.to_datetime(odds_history["Date"])

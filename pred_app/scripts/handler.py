@@ -2,6 +2,7 @@
 This module contains Data Handler Classes and Methods
 """
 import typing as t
+from datetime import datetime
 from PIL import Image
 import pandas as pd
 import numpy as np
@@ -18,14 +19,99 @@ class Handler:
     def __init__(self):
         self.data = None
         self.loaded = None
+        self.slot_one = None
+        self.slot_two = None
+        self.slot_three = None
 
-    def load_data(self, data):
+    def load_data(self, data: t.Any) -> None:
         """Loads data for extra processing"""
 
         self.data = data
-        self.loaded = data
+        self.loaded = data.copy()
 
-    def print_data(self):
+    def stow_data(self, slot: int = 1) -> None:
+        """
+        Saves a copy of the current data for later use
+
+        Slots available: 3
+        """
+
+        self.__slot_check(slot)
+
+        if slot == 1:
+            self.slot_one = self.data.copy()
+        elif slot == 2:
+            self.slot_two = self.data.copy()
+        else:
+            self.slot_three = self.data.copy()
+
+    def unstow_data(self, slot: int = 1) -> None:
+        """
+        Loads a copy of the stowed data at given slot
+
+        Slots available: 3
+        """
+
+        self.__slot_check(slot)
+
+        if slot == 1:
+            self.data = self.slot_one.copy()
+            self.loaded = self.slot_one.copy()
+
+        elif slot == 2:
+            self.data = self.slot_two.copy()
+            self.loaded = self.slot_two.copy()
+
+        else:
+            self.data = self.slot_three.copy()
+            self.loaded = self.slot_three.copy()
+
+    def concat_to_stowed(
+        self, slot: int = 1, stowed_first: bool = False, axis: int = 0
+    ) -> None:
+        """
+        Concats current data to a stowed dataset
+
+        Data should match in length or shape, depending on axis
+
+        Slots available: 3
+        """
+
+        self.__slot_check(slot)
+        self.__concat_check(stowed_first, axis)
+
+        if not stowed_first:
+            if slot == 1:
+                self.data = pd.concat(
+                    [self.data, self.slot_one], axis=axis
+                ).reset_index(drop=True)
+
+            elif slot == 2:
+                self.data = pd.concat(
+                    [self.data, self.slot_two], axis=axis
+                ).reset_index(drop=True)
+
+            elif slot == 3:
+                self.data = pd.concat(
+                    [self.data, self.slot_three], axis=axis
+                ).reset_index(drop=True)
+        else:
+            if slot == 1:
+                self.data = pd.concat(
+                    [self.slot_one, self.data], axis=axis
+                ).reset_index(drop=True)
+
+            elif slot == 2:
+                self.data = pd.concat(
+                    [self.slot_two, self.data], axis=axis
+                ).reset_index(drop=True)
+
+            elif slot == 3:
+                self.data = pd.concat(
+                    [self.slot_three, self.data], axis=axis
+                ).reset_index(drop=True)
+
+    def print_data(self) -> None:
         """Prints currently loaded data"""
 
         print(self.data)
@@ -35,10 +121,75 @@ class Handler:
 
         return self.data
 
-    def reset_filter(self):
+    def reset_data(self) -> None:
         """Resets data to unfiltered state"""
 
-        self.data = self.loaded
+        self.data = self.loaded.copy()
+
+    def drop_columns(self, columns_to_drop: t.Any) -> None:
+        """Drops a str, list, tuple, or enumerate of columns"""
+
+        self.data.drop(columns_to_drop, axis=1, inplace=True)
+
+    def sort_columns(self, column: t.Any, ascending: bool) -> None:
+        """Sorts given column"""
+
+        self.data.sort_values(column, ascending=ascending, inplace=True)
+        self.data.reset_index(drop=True, inplace=True)
+
+    def filter_columns(self, column, value) -> None:
+        """Filters a column by a value"""
+
+        mask = self.data[column] == value
+        self.data = self.data.loc[mask].reset_index(drop=True)
+
+    def filter_date_range(self, column, start_date, end_date) -> None:
+        """Filters date column by start and end date range"""
+
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        self.data[column] = pd.to_datetime(self.data[column])
+
+        mask = (self.data[column] >= start_date) & (self.data[column] <= end_date)
+        self.data = self.data.loc[mask].reset_index(drop=True)
+
+    def print_columns(self) -> None:
+        """Prints a list of columns in current data"""
+
+        print(*self.data.columns)
+
+    def rename_columns(self, new_columns_dict: dict):
+        """Renames columns in current data based on given dict"""
+
+        self.data = self.data.rename(columns=new_columns_dict)
+
+    def regex_drop_columns(self, regex_str: str) -> None:
+        """Filters columns by regex input"""
+
+        self.data = self.data[
+            self.data.columns.drop(list(self.data.filter(regex=f"{regex_str}")))
+        ]
+
+    def to_csv(self, file_name) -> None:
+        """Exports current data to .csv file"""
+
+        self.data.to_csv(f"{file_name}.csv", index=None)
+
+    def __slot_check(self, slot) -> None:
+        """Func"""
+
+        if slot > 3 or slot < 0:
+            raise ValueError(f"Choose from slot 1, 2, or 3. Slot received: {slot}")
+
+    def __concat_check(self, stowed_first, axis) -> None:
+        """Func"""
+
+        if not isinstance(stowed_first, bool):
+            raise ValueError(
+                f"Stowed First must be boolean - True/False. Type received: {type(stowed_first)}"
+            )
+        if not axis == 0 or not axis == 1:
+            raise ValueError(f"Axis must be 0 or 1. Axis received: {axis}")
 
 
 class GeneralHandler(Handler):
@@ -49,77 +200,72 @@ class GeneralHandler(Handler):
     def __init__(self):
         super().__init__()
 
-    def return_schedule(self) -> pd.DataFrame:
+    def upcoming_schedule(self) -> pd.DataFrame:
         """Returns most up-to-date upcoming schedule"""
 
         return pd.read_sql_table("upcoming_schedule_table", const.ENGINE)
 
-    def return_sim_data(self) -> pd.DataFrame:
+    def general_sim_data(self) -> pd.DataFrame:
         """Returns data used for general simulations"""
 
         return pd.read_sql_table("simulator_data", const.ENGINE)
 
-    def return_sim_pred_data(self) -> pd.DataFrame:
+    def pred_sim_data(self) -> pd.DataFrame:
         """Returns data used for prediction based simulations"""
 
         return pd.read_sql_table("sim_pred_data", const.ENGINE)
 
-    def return_current_odds_history(self) -> pd.DataFrame:
+    def current_odds_history(self) -> pd.DataFrame:
         """Returns current season game line stats (2023)"""
 
         return pd.read_sql_table("current_odds_history", const.ENGINE)
 
-    def return_full_odds_history(self) -> pd.DataFrame:
+    def full_odds_history(self) -> pd.DataFrame:
         """Returns full game line stats (2008-2023)"""
 
         return pd.read_sql_table("full_odds_history", const.ENGINE)
 
-    def return_training_data(self) -> pd.DataFrame:
+    def training_data(self) -> pd.DataFrame:
         """Returns full model training data"""
 
         return pd.read_sql_table("training_data", const.ENGINE)
 
-    def return_prediction_history(self) -> pd.DataFrame:
+    def prediction_history(self) -> pd.DataFrame:
         """Returns prediction history of Net focused model"""
 
         return pd.read_sql_table("prediction_history_net", const.ENGINE)
 
-    def return_prediction_history_massey(self) -> pd.DataFrame:
+    def prediction_history_massey(self) -> pd.DataFrame:
         """Returns prediction history of Massey focused model"""
 
         return pd.read_sql_table("prediction_history_massey", const.ENGINE)
 
-    def return_schedule_by_year(self, year) -> pd.DataFrame:
+    def schedule_by_year(self, year) -> pd.DataFrame:
         """Returns schedule of completed games for given year"""
 
         return pd.read_sql_table(f"{year}_played_games", const.ENGINE)
 
-    def return_upcoming_schedule_by_year(self, year) -> pd.DataFrame:
-        """Returns schedule of upcoming games for given year"""
-
-        return pd.read_sql_table(f"{year}_upcoming_games", const.ENGINE)
-
-    def return_boxscore_data(self) -> pd.DataFrame:
+    def boxscore_data(self) -> pd.DataFrame:
         """Returns full boxscore dataset"""
 
         return pd.read_sql_table("boxscore_data", const.ENGINE)
 
-    def return_raw_team_stats(self) -> pd.DataFrame:
+    def raw_team_stats(self) -> pd.DataFrame:
         """Returns current team stats without additions"""
 
         return pd.read_sql_table("team_stats", const.ENGINE)
 
-    def return_current_massey(self) -> pd.DataFrame:
+    def current_massey(self) -> pd.DataFrame:
         """Returns current massey ratings for each team"""
 
         return pd.read_sql_table("current_massey", const.ENGINE)
 
-    def return_current_team_stats(self) -> pd.DataFrame:
+    def current_team_stats(self) -> pd.DataFrame:
         """Returns current team stats with additions"""
 
         return pd.read_sql_table("all_stats", const.ENGINE)
 
-    def return_pred_scoring(self) -> pd.DataFrame:
+    def pred_scoring(self) -> pd.DataFrame:
         """Returns full prediction historical data"""
 
         return pd.read_sql_table("prediction_scoring", const.ENGINE)
@@ -303,12 +449,12 @@ class OddsHandler(Handler):
         self.data = pd.read_sql_table("odds_stats", const.ENGINE)
         self.grouped = self.data.groupby("Team")
 
-    def return_team_averages(self, team_name) -> t.Any:
+    def team_odds_averages(self, team_name) -> t.Any:
         """Returns given team's current odds stats"""
 
         return self.grouped.get_group(team_name)
 
-    def return_teams_compare(self, team_one: str, team_two: str):
+    def team_odds_compare(self, team_one: str, team_two: str):
         """Returns two given team's current odds stats for comparison"""
 
         t1_final = self.grouped.get_group(team_one)
@@ -327,37 +473,37 @@ class MetricsHandler(Handler):
     def __init__(self):
         super().__init__()
 
-    def return_today(self) -> pd.DataFrame:
+    def today_preds(self) -> pd.DataFrame:
         """Returns today' predictions table"""
 
         return pd.read_sql_table("today_preds", const.ENGINE)
 
-    def return_metrics(self) -> pd.DataFrame:
+    def metrics(self) -> pd.DataFrame:
         """Returns today's metrics table"""
 
         return pd.read_sql_table("metric_scores", const.ENGINE)
 
-    def return_pred_history(self) -> pd.DataFrame:
+    def pred_history(self) -> pd.DataFrame:
         """Returns full prediction historical data"""
 
         return pd.read_sql_table("prediction_scoring", const.ENGINE)
 
-    def return_current_odds_history(self) -> pd.DataFrame:
+    def current_odds_history(self) -> pd.DataFrame:
         """Returns current season game line stats (2023)"""
 
         return pd.read_sql_table("current_odds_history", const.ENGINE)
 
-    def return_feature_scores(self) -> pd.DataFrame:
+    def feature_scores(self) -> pd.DataFrame:
         """Returns today's feature scoring table"""
 
         return pd.read_sql_table("feature_scores", const.ENGINE)
 
-    def return_hyper_scores(self) -> pd.DataFrame:
+    def hyper_scores(self) -> pd.DataFrame:
         """Returns most recent hyperparameter scoring table"""
 
         return pd.read_sql_table("hyper_scores", const.ENGINE)
 
-    def return_sim_data(self) -> pd.DataFrame:
+    def general_sim_data(self) -> pd.DataFrame:
         """Returns data used for general simulations"""
 
         return pd.read_sql_table("simulator_data", const.ENGINE)

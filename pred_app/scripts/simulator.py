@@ -34,8 +34,8 @@ class Simulator:
         Func
         """
 
-        pred_history_data = self.data_handler.return_pred_history()
-        current_data = self.data_handler.return_current_odds_history()
+        pred_history_data = self.data_handler.pred_history()
+        current_data = self.data_handler.current_odds_history()
         pred_history_data = pred_history_data.rename(columns={"Outcome": "Bet_Status"})
 
         filter_check = list(current_data["Date"].unique())
@@ -210,7 +210,7 @@ class SimRandom(Simulator):
         Func
         """
 
-        sim_data = self.data_handler.return_sim_data()
+        sim_data = self.data_handler.general_sim_data()
         sim_data = sim_data.sample(self.num_games).reset_index(drop=True)
         faux_outcomes = np.random.binomial(1, self.win_rate, sim_data.shape[0])
         sim_data["Bet_Status"] = faux_outcomes
@@ -404,7 +404,7 @@ class SimAdvanced(Simulator):
         """
 
         data_handler = handler.MetricsHandler()
-        prep_data = data_handler.return_pred_history()
+        prep_data = data_handler.pred_history()
 
         prep_data = prep_data.rename(columns={"Outcome": "Bet_Status"})
 

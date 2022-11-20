@@ -48,12 +48,12 @@ if __name__ == "__main__":
     #  MetricsHandler handles returns/prints of Model Metric Data
 
     MetricsHandler = MetricsHandler()
-    print(MetricsHandler.return_feature_scores())
-    print(MetricsHandler.return_hyper_scores())
-    print(MetricsHandler.return_metrics())
-    print(MetricsHandler.return_today())
+    print(MetricsHandler.feature_scores())
+    print(MetricsHandler.hyper_scores())
+    print(MetricsHandler.metrics())
+    print(MetricsHandler.today_preds())
 
-    history_data = MetricsHandler.return_pred_history()
+    history_data = MetricsHandler.pred_history()
     print("\n")
     print(sum(history_data.Outcome == 1))
     print(sum(history_data.Outcome == 0))

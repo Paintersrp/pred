@@ -40,7 +40,7 @@ class Predictor:
     """
 
     def __init__(self):
-        self.train_data = DATAHANDLER.return_training_data()
+        self.train_data = DATAHANDLER.training_data()
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data[const.NET_FULL_FEATURES]
         self.model = None
@@ -56,7 +56,7 @@ class Predictor:
         Sets the training data to data filtered to games with odds history attached
         """
 
-        self.train_data = DATAHANDLER.return_sim_pred_data()
+        self.train_data = DATAHANDLER.pred_sim_data()
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data
         self.sim_mode = True
