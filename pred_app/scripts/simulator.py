@@ -11,7 +11,9 @@ from scripts import handler
 
 class Simulator:
     """
-    Class
+    Contains methods for simulating betting under various conditions
+
+    Base Model runs a test of betting value outcomes for the current season's predictions
     """
 
     def __init__(self, bet_value: float) -> None:
@@ -22,16 +24,17 @@ class Simulator:
 
         self.data_handler = handler.MetricsHandler()
         self.bet_value = bet_value
-        self.data = self.__prepare_data()
-
         self.value_won = None
         self.value_lost = None
         self.net_total = None
         self.ratio = None
+        self.__prepare_data()
 
     def __prepare_data(self) -> pd.DataFrame:
         """
-        Func
+        Prepares dataset for by matching game odds to predicted games
+
+        Adds column for Payout Rate and Payout Value
         """
 
         pred_history_data = self.data_handler.pred_history()
@@ -76,32 +79,32 @@ class Simulator:
             -abs(self.bet_value),
         )
 
-        return combined
+        combined["Value"] = combined["Value"].astype(float)
+
+        self.data = combined.copy()
 
     def return_data(self) -> pd.DataFrame:
         """
-        Func
+        Returns current dataset
         """
 
         return self.data
 
     def calculate(self) -> None:
         """
-        Func
+        Calculates totals for current parameters on the dataset
         """
 
-        self.data["Value"] = np.where(
-            self.data["Bet_Status"] == 1,
-            (100 / abs(self.data["ML_Payout"])) * self.bet_value,
-            -abs(self.bet_value),
+        bets_won = (
+            self.data.loc[self.data["Bet_Status"] == 1].reset_index(drop=True).copy()
         )
-
-        bets_won = self.data.loc[self.data["Bet_Status"] == 1].reset_index(drop=True)
-        bets_lost = self.data.loc[self.data["Bet_Status"] == 0].reset_index(drop=True)
+        bets_lost = (
+            self.data.loc[self.data["Bet_Status"] == 0].reset_index(drop=True).copy()
+        )
 
         self.value_won = sum(bets_won["Value"])
         self.value_lost = sum(bets_lost["Value"])
-        self.net_total = self.value_won + self.value_lost
+        self.net_total = self.value_won - abs(self.value_lost)
         self.ratio = round(self.value_won / abs(self.value_lost) * 100, 2)
 
     def return_totals(self) -> tuple[float, float, float, float]:
@@ -128,7 +131,7 @@ class Simulator:
         return (
             self.data.sort_values("Value", ascending=False)
             .reset_index(drop=True)
-            .head(5)
+            .head(25)
         )
 
     def worst_losses(self) -> pd.DataFrame:
@@ -141,13 +144,14 @@ class Simulator:
         return (
             loss_data.sort_values("ML_Payout", ascending=False)
             .reset_index(drop=True)
-            .head(5)
+            .head(25)
         )
 
     def update_bet_value(self, bet_value) -> None:
         """
-        Func
+        Updates parameter bet value and prepares new dataset
         """
+
         if isinstance(bet_value, str) or bet_value <= 0:
             raise ValueError(
                 f"Bet Value must not be negative, 0, or a string. Bet Value Received: {bet_value}"
@@ -155,26 +159,26 @@ class Simulator:
 
         self.bet_value = bet_value
 
-    def export_to_csv(self) -> None:
+        if isinstance(self, SimAdvanced):
+            self.adjust_data()
+        else:
+            self.__prepare_data()
+
+    def to_csv(self, file_name) -> None:
         """
-        Func
+        Save current dataset to CSV file
         """
 
-        #  maybe add return totals to csv before
-
-        data = self.data
-        data2 = pd.DataFrame(
-            ["-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"]
-            + list(self.return_totals())
-        ).T
-
-        data2.columns = data.columns
-        data = pd.concat([data, data2], axis=0, join="outer").reset_index(drop=True)
-        data.to_csv("SimResults.csv", index=None)
+        return_data = pd.DataFrame(list(self.return_totals())).T
+        return_data.columns = ["Won", "Lost", "Net", "Ratio"]
+        final_data = pd.concat(
+            [return_data, self.data], axis=1, join="outer"
+        ).reset_index(drop=True)
+        final_data.to_csv(f"{file_name}.csv", index=None)
 
     def save_sim(self, file_name: str) -> None:
         """
-        Func
+        Saves current simulator object to disk
         """
 
         with open(f"{file_name}.pkl", "wb") as writer:
@@ -182,7 +186,7 @@ class Simulator:
 
     def load_sim(self, file_name: str) -> object:
         """
-        Func
+        Loads simulator object from disk
         """
 
         with open(f"{file_name}.pkl", "rb") as writer:
@@ -193,7 +197,9 @@ class Simulator:
 
 class SimRandom(Simulator):
     """
-    Class
+    Contains methods for simulating betting under randomized conditions
+
+    Bet wins are assigned at random to a given win rate over a given number of games
     """
 
     def __init__(self, bet_value: float, win_rate: float, num_games: int) -> None:
@@ -203,12 +209,16 @@ class SimRandom(Simulator):
         self.win_rate = win_rate
         self.num_games = num_games
         self.sim_data = []
-        self.reroll()
+        self.reroll(win_rate, num_games)
 
-    def reroll(self) -> pd.DataFrame:
+    def reroll(self, win_rate: float, num_games: float) -> None:
         """
-        Func
+        Performs another randomized simulator at given parameters
         """
+
+        self.__check_parameters(win_rate, num_games)
+        self.win_rate = win_rate
+        self.num_games = num_games
 
         sim_data = self.data_handler.general_sim_data()
         sim_data = sim_data.sample(self.num_games).reset_index(drop=True)
@@ -233,25 +243,9 @@ class SimRandom(Simulator):
 
         self.data = sim_data
 
-    def update_win_rate(self, win_rate) -> None:
+    def __check_parameters(self, win_rate: float, num_games: int) -> None:
         """
-        Func
-        """
-
-        self.__check_parameters(win_rate, self.num_games)
-        self.win_rate = win_rate
-
-    def update_num_games(self, num_games) -> None:
-        """
-        Func
-        """
-
-        self.__check_parameters(self.win_rate, num_games)
-        self.num_games = num_games
-
-    def __check_parameters(self, win_rate: float, num_games: int):
-        """
-        Func
+        Parameter error handling
         """
 
         if isinstance(win_rate, str) or win_rate <= 0:
@@ -277,7 +271,9 @@ class SimRandom(Simulator):
 
 class SimPredictor(Simulator):
     """
-    Class
+    Contains methods for simulating betting with model predictions
+
+    Bet wins are assigned by comparing model prediction to actual result
     """
 
     def __init__(self, bet_value: float, random: bool, year: int = 2022):
@@ -290,16 +286,18 @@ class SimPredictor(Simulator):
 
     def reroll(self, random: bool, year: int = 2022) -> pd.DataFrame:
         """
-        Func
+        Builds and predicts a new dataset based on given parameters
+
+        Adds Prediction, ML_Payout (Payout Rate), and Value (Bet Return/Loss Value)
         """
 
         self.__check_parameters(random, year)
         self.sim_predictor.enable_sim_mode()
 
         if random:
-            self.predictions = self.sim_predictor.predict(True, True, None)
+            self.predictions = self.sim_predictor.predict(True, False)
         else:
-            self.predictions = self.sim_predictor.predict(False, True, year)
+            self.predictions = self.sim_predictor.predict(False, False, year)
 
         self.predictions = pd.DataFrame(self.predictions, columns=["Pred"])
         self.test_data = self.sim_predictor.unfiltered_test_data.reset_index(drop=True)
@@ -334,16 +332,16 @@ class SimPredictor(Simulator):
         )
 
         self.test_data["Value"] = np.where(
-            self.test_data["Outcome"] == 1,
+            self.test_data["Bet_Status"] == 1,
             (100 / abs(self.test_data["ML_Payout"])) * self.bet_value,
             -abs(self.bet_value),
         )
 
-        self.data = self.test_data
+        self.data = self.test_data.copy()
 
     def __check_parameters(self, random: bool, year: int):
         """
-        Func
+        Parameter error handling
         """
 
         if isinstance(random, str):
@@ -370,155 +368,167 @@ class SimPredictor(Simulator):
             raise ValueError(f"Year must be a whole number. Year Received: {year}")
 
 
-# bet skip = skip anything 45-55%
-# lean in = add bet value for 85-100%
-# lean out = lower bet value for 55-65%
-class SimAdvanced(Simulator):
-    #  pylint: disable=too-many-instance-attributes
+class SimAdvanced(SimPredictor):
+    #  pylint: disable=too-many-arguments
     """
-    Class
+    Contains methods for simulating betting with model predictions
+
+    Bet wins are assigned by comparing model prediction to actual result
+
+    Betting logic is adjusted based on rule enabling
     """
 
     def __init__(
         self,
         bet_value: float,
-        bet_skip: bool = True,
+        random: bool = True,
+        year: int = 2022,
         lean_in: bool = True,
         lean_out: bool = True,
     ) -> None:
-        super().__init__(bet_value)
-        self.bet_skip = bet_skip
+        super().__init__(bet_value, random, year)
+        self.__check_parameters(lean_in, lean_out)
+
         self.lean_in = lean_in
         self.lean_out = lean_out
 
-        self.bet_skip_min = 0.501
-        self.bet_skip_max = 0.550
-        self.lean_in_min = 0.850
-        self.lean_in_max = 0.999
-        self.lean_out_min = 0.551
-        self.lean_out_max = 0.650
+        self.lean_out_min = 500
+        self.lean_out_max = 10000
+        self.lean_in_min = 110
+        self.lean_in_max = 150
 
-    def __prepare_data(self) -> pd.DataFrame:
+        self.__score_unadjusted()
+        self.adjust_data()
+
+    def adjust_rule_parameters(
+        self,
+        lean_in_minimum: int,
+        lean_in_maximum: int,
+        lean_out_minimum: int,
+        lean_out_maximum: int,
+    ) -> None:
         """
-        Func
+        Changes rule parameters based on input and adjusts the data to new parameters
         """
 
-        data_handler = handler.MetricsHandler()
-        prep_data = data_handler.pred_history()
-
-        prep_data = prep_data.rename(columns={"Outcome": "Bet_Status"})
-
-        # load odds data, filter to dates
-        # either take the bet_status from pred history and add to odds_data
-        # or take ml_payout from odds data and add to pred history
-        # adjust math on np wheres to correct
-
-        prep_data["Rule"] = None
-
-        prep_data["Rule"] = np.where(
-            self.lean_in_min <= prep_data["A_Odds"] <= self.lean_in_min,
-            "Lean-In",
-            prep_data["Rule"],
+        self.__check_rule_parameters(
+            lean_in_minimum, lean_in_maximum, lean_out_minimum, lean_out_maximum
         )
 
-        prep_data["Rule"] = np.where(
-            self.lean_out_min <= prep_data["A_Odds"] <= self.lean_out_min,
-            "Lean-Out",
-            prep_data["Rule"],
+        self.lean_in_min = lean_in_minimum
+        self.lean_in_max = lean_in_maximum
+        self.lean_out_min = lean_out_minimum
+        self.lean_out_max = lean_out_maximum
+        self.adjust_data()
+
+    def return_unadjusted(self) -> tuple[float, float, float, float]:
+        """Returns score of dataset before rule adjustments"""
+
+        return self.unadjusted_score
+
+    def adjust_data(self) -> None:
+        """
+        Prepares dataset by applying rule adjustments based on Class parameters
+        """
+
+        rule_col = []
+        bet_col = []
+
+        for i in self.data.index:
+            if self.lean_out_min <= abs(self.data.at[i, "A_ML"]) <= self.lean_out_max:
+                if self.lean_in:
+                    rule_col.append("Lean-In")
+                    bet_col.append(self.bet_value * 0.01)
+                else:
+                    rule_col.append("Lean-In")
+                    bet_col.append(self.bet_value)
+
+            elif self.lean_in_min <= abs(self.data.at[i, "A_ML"]) <= self.lean_in_max:
+                if self.lean_out:
+                    rule_col.append("Lean-Out")
+                    bet_col.append(self.bet_value * 2)
+                else:
+                    rule_col.append("Lean-Out")
+                    bet_col.append(self.bet_value)
+            else:
+                rule_col.append("None")
+                bet_col.append(self.bet_value)
+
+        self.data["Rule"] = rule_col
+        self.data["Bet"] = bet_col
+
+        self.data["Value"] = np.where(
+            self.data["Bet_Status"] == 1,
+            (100 / abs(self.data["ML_Payout"])) * self.data["Bet"],
+            -abs(self.data["Bet"]),
         )
 
-        prep_data["Rule"] = np.where(
-            self.bet_skip_min <= prep_data["A_Odds"] <= self.bet_skip_min,
-            "Skip",
-            prep_data["Rule"],
-        )
+    def toggle_rules(self, lean_in: bool, lean_out: bool) -> None:
+        """Enables/Disables rule logic based on input"""
 
-        prep_data["Bet"] = self.bet_value
+        self.__check_parameters(lean_in, lean_out)
+        self.lean_in = lean_in
+        self.lean_out = lean_out
+        self.adjust_data()
 
-        prep_data["Bet"] = np.where(
-            prep_data["Rule"] == "Lean-In", prep_data["Bet"] * 1.25, prep_data["Bet"]
-        )
+    def __score_unadjusted(self) -> None:
+        """Saves score before adjustments for comparison"""
 
-        prep_data["Bet"] = np.where(
-            prep_data["Rule"] == "Lean-Out", prep_data["Bet"] * 0.75, prep_data["Bet"]
-        )
+        self.calculate()
+        self.unadjusted_score = self.return_totals()
 
-        prep_data["Bet"] = np.where(prep_data["Rule"] == "Skip", 0.00, prep_data["Bet"])
-
-        prep_data["Value"] = np.where(
-            prep_data["Bet_Status"] == 1,
-            prep_data["ML_Payout"] * prep_data["Bet"],
-            -abs(prep_data["Bet"]),
-        )
-
-        return prep_data
-
-    def adjust_bet_skip_range(self, minimum, maximum) -> None:
+    def __check_parameters(self, lean_in: bool, lean_out: int) -> None:
         """
-        Func
+        Parameter error handling
         """
 
-        self.bet_skip_min = minimum
-        self.bet_skip_max = maximum
-        # self.__prepare_data()
+        if isinstance(lean_in, str):
+            raise ValueError(
+                f"Lean In must be True or False, not a string. Type Received: {type(lean_in)}"
+            )
 
-    def adjust_lean_in_range(self, minimum, maximum) -> None:
+        if not isinstance(lean_in, bool):
+            raise ValueError(
+                f"Lean In must be True or False. State Received: {lean_in}"
+            )
+
+        if isinstance(lean_out, str):
+            raise ValueError(
+                f"Lean Out must be True or False, not a string. Type Received: {type(lean_out)}"
+            )
+
+        if not isinstance(lean_out, bool):
+            raise ValueError(
+                f"Lean Out must be True or False. State Received: {lean_out}"
+            )
+
+    def __check_rule_parameters(
+        self,
+        lean_in_minimum: int,
+        lean_in_maximum: int,
+        lean_out_minimum: int,
+        lean_out_maximum: int,
+    ) -> None:
         """
-        Func
-        """
-
-        self.lean_in_min = minimum
-        self.lean_in_max = maximum
-        # self.__prepare_data()
-
-    def adjust_lean_out_range(self, minimum, maximum) -> None:
-        """
-        Func
-        """
-
-        self.lean_out_min = minimum
-        self.lean_out_max = maximum
-        # self.__prepare_data()
-
-    def test_bet_skip(self) -> None:
-        """
-        Func
-        """
-
-        #   bet skip test - same as lean in, same calculations
-
-        pass
-
-    def test_lean_in(self) -> None:
-        """
-        Func
+        Rule parameter error handling
         """
 
-        #   lean in filtered test - use handler to get all games with 85-100% for one team
-        #       calculate win%, # of losses, earned/lost ratio, profit with, profit without, loss with, etc         #  pylint: disable=line-too-long
+        if not isinstance(lean_in_minimum, (int, float)):
+            raise ValueError(
+                f"Lean In Minimum should be numeric and not a string. Type Received: {type(lean_in_minimum)}"  #  pylint: disable=line-too-long
+            )
 
-        pass
+        if not isinstance(lean_in_maximum, (int, float)):
+            raise ValueError(
+                f"Lean In Maximum should be numeric and not a string. Type Received: {type(lean_in_maximum)}"  #  pylint: disable=line-too-long
+            )
 
-    def test_lean_out(self) -> None:
-        """
-        Func
-        """
+        if not isinstance(lean_out_minimum, (int, float)):
+            raise ValueError(
+                f"Lean Out Minimum should be numeric and not a string. Type Received: {type(lean_out_minimum)}"  #  pylint: disable=line-too-long
+            )
 
-        #   lean out filtered test -  as lean in, same calculations
-
-        pass
-
-    def calculate(self) -> None:
-        """
-        Func
-        """
-
-        bets_won = self.data.loc[self.data["Bet_Status"] == 1].reset_index(drop=True)
-        bets_lost = self.data.loc[self.data["Bet_Status"] == 0].reset_index(drop=True)
-
-        # after move - can I just keep base calculate method?
-
-        self.value_won = sum(bets_won["Value"])
-        self.value_lost = sum(bets_lost["Value"])
-        self.net_total = self.value_won - self.value_lost
-        self.ratio = self.value_won / self.value_lost
+        if not isinstance(lean_out_maximum, (int, float)):
+            raise ValueError(
+                f"Lean Out Maximum should be numeric and not a string. Type Received: {type(lean_out_maximum)}"  #  pylint: disable=line-too-long
+            )

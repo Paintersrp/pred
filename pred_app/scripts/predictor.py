@@ -170,8 +170,6 @@ class Predictor:
         loud: bool = False,
         year: int = 2022,
     ) -> pd.DataFrame:
-        #  pylint: disable=too-many-arguments
-
         """
         Purpose
         ----------
@@ -258,7 +256,7 @@ class Predictor:
 
         return scores
 
-    def hyperparameter_tuning(self) -> None:
+    def hyperparameter_tuning(self, loud: bool = False) -> pd.DataFrame:
         """
         Tests hyperparameters based on a narrow grid of options randomly, scoring each
 
@@ -285,11 +283,15 @@ class Predictor:
 
         parameters.remove("mean_test_score")
 
-        for parameter in parameters:
-            temp1 = (
-                hypers.groupby(parameter)["mean_test_score"].agg(np.mean).reset_index()
-            )
-            temp1 = temp1.sort_values(by=["mean_test_score"], ascending=False)
+        if loud:
+            for parameter in parameters:
+                temp1 = (
+                    hypers.groupby(parameter)["mean_test_score"]
+                    .agg(np.mean)
+                    .reset_index()
+                )
+                temp1 = temp1.sort_values(by=["mean_test_score"], ascending=False)
+                print(temp1)
 
         return hypers
 
@@ -297,7 +299,7 @@ class Predictor:
         self,
     ) -> int:
         """
-        Finds the ideal number of trees for the model
+        Finds the ideal number of trees/estimators for the model
         """
 
         x_matrix = xgb.DMatrix(self.net_data, label=self.outcomes)
@@ -474,7 +476,7 @@ class DailyPredictor(Predictor):
 
     def prepare_test_data(
         self,
-    ):
+    ) -> None:
         """
         Adds placeholder outcomes for today's games
 
@@ -506,7 +508,6 @@ class DailyPredictor(Predictor):
     def predict_today(
         self,
     ) -> pd.DataFrame:
-        #  pylint: disable=too-many-arguments
 
         """
         Purpose

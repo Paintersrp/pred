@@ -160,26 +160,8 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
         final["Name"] == "Los Angeles Clippers", "LA Clippers", final["Name"]
     )
 
-    # cur_massey = final.sort_index(axis=0, ascending=False)
-    # cur_massey = cur_massey.groupby("Name").head(1).reset_index(drop=True)
-    # cur_massey.drop(cur_massey.tail(1).index, inplace=True)
-    # cur_massey["Conf"] = cur_massey["Name"].map(dicts.conf_dict)
-    # cur_massey = cur_massey.sort_values("Massey", ascending=False).reset_index(
-    #     drop=True
-    # )
-    # cur_massey.to_sql("Current_Massey", const.ENGINE, if_exists="replace", index=False)
-
-    # massey_ratings = final.groupby("Name")
-
     return final
 
 
 if __name__ == "__main__":
-    # data = pd.read_sql_table("full_sch", const.ENGINE)
-    # season_id = '2021-22'
-    # game_date = '2022-05-01'
-
-    # massey = get_massey(data, season_id, game_date)
-    # add_massey()
-    # add_elo()
     pass

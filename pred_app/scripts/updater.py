@@ -42,7 +42,7 @@ class Updater:
                 print("No games scheduled today.")
                 sys.exit()
         else:
-            raise Exception(f"JSON Request: Status Code - {req.status_code} ")
+            raise Exception(f"JSON Request: Status Code - {req.status_code}")
 
         return data
 
@@ -129,7 +129,7 @@ class Updater:
 
         return massey_ratings
 
-    def update_metrics(self, metrics_data: list) -> pd.DataFrame:
+    def update_metrics(self, metrics_data: list) -> None:
         """
         Builds table of scoring metrics and commits to database
         """
@@ -197,7 +197,6 @@ class Updater:
         pred_history_update = data[["Date", "A_Team", "A_Odds", "H_Team", "H_Odds"]]
 
         if features == const.NET_FULL_FEATURES:
-            # old_pred_history = pd.read_sql_table("prediction_history_net", const.ENGINE)
             old_pred_history = DATAHANDLER.prediction_history()
 
             new_pred_history = pd.concat(
@@ -213,10 +212,6 @@ class Updater:
             )
 
         elif features == const.MASSEY_FULL_FEATURES:
-
-            # old_pred_history = pd.read_sql_table(
-            #     "prediction_history_massey", const.ENGINE
-            # )
             old_pred_history = DATAHANDLER.prediction_history_massey()
 
             new_pred_history = pd.concat(
@@ -283,9 +278,6 @@ class Updater:
 
         Scrapes missing game data, committing to boxscore data
         """
-
-        # box = pd.read_sql_table("boxscore_data", const.ENGINE)
-        # played = pd.read_sql_table("2023_played_games", const.ENGINE)
 
         box = DATAHANDLER.boxscore_data()
         played = DATAHANDLER.schedule_by_year(2023)
@@ -358,9 +350,6 @@ class Updater:
         Combines daily team stat and massey rating updates for display
         """
 
-        # massey = pd.read_sql_table("current_massey", const.ENGINE)
-        # team = pd.read_sql_table("team_stats", const.ENGINE)
-
         massey = DATAHANDLER.current_massey()
         team = DATAHANDLER.raw_team_stats()
 
@@ -420,11 +409,9 @@ class Updater:
 
         new_history = []
 
-        # predicted = pd.read_sql_table("prediction_history_net", const.ENGINE)
         predicted = DATAHANDLER.prediction_history()
         predicted["Actual"] = "TBD"
 
-        # played = pd.read_sql_table("2023_played_games", const.ENGINE)
         played = DATAHANDLER.schedule_by_year(2023)
 
         played["Away"] = np.where(
@@ -468,8 +455,6 @@ class Updater:
             new_history.append(filtered_predicted)
 
         new_history = pd.concat(new_history, axis=0, join="outer")
-
-        # previous_history = pd.read_sql_table("prediction_scoring", const.ENGINE)
         previous_history = DATAHANDLER.pred_scoring()
 
         combined = pd.concat([previous_history, new_history], axis=0, join="outer")
@@ -484,7 +469,6 @@ class Updater:
         Updates upcoming schedule of unplayed games data
         """
 
-        # upcoming_games = pd.read_sql_table("2023_upcoming_games", const.ENGINE)
         upcoming_games = DATAHANDLER.upcoming_schedule_by_year(2023)
         today_mask = upcoming_games["Date"] != str(date.today())
         upcoming_games = upcoming_games.loc[today_mask].reset_index(drop=True)
@@ -492,14 +476,14 @@ class Updater:
             "upcoming_schedule_table", const.ENGINE, if_exists="replace", index=False
         )
 
-    def update_feature_scores(self, scores) -> None:
+    def update_feature_scores(self, scores: pd.DataFrame) -> None:
         """
         Commits feature scores to database
         """
 
         scores.to_sql("feature_scores", const.ENGINE, if_exists="replace", index=False)
 
-    def update_hyper_scores(self, hyper_scores) -> None:
+    def update_hyper_scores(self, hyper_scores: pd.DataFrame) -> None:
         """
         Commits hyperparameter scores to database
         """
@@ -510,25 +494,27 @@ class Updater:
 
     def update_odds_full(self) -> None:
         """
-        Yar
+        Commits new full odds history based on daily additions/updates
         """
 
-        old_odd_history = pd.read_sql_table("full_odds_history", const.ENGINE)
-        new_odd_history = pd.read_sql_table("current_odds_history", const.ENGINE)
+        old_odd_history = DATAHANDLER.full_odds_history()
+        new_odd_history = DATAHANDLER.current_odds_history()
 
         new_odd_history = pd.concat(
             [old_odd_history, new_odd_history], axis=0, join="outer"
         ).reset_index(drop=True)
+
         new_odd_history.drop_duplicates(
             subset=["Date", "H_Team"], keep="first", inplace=True
         )
+
         new_odd_history.to_sql(
             "full_odds_history", const.ENGINE, if_exists="replace", index=False
         )
 
     def update_odds_current(self) -> None:
         """
-        Yar
+        Updates to most current odds history for this season
         """
 
         data = pd.read_excel(const.ODDS_UPDATE_URL)

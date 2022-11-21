@@ -245,6 +245,13 @@ BOX_FEATURES = (
     + ["H_" + item for item in ADVANCED]
 )
 
+BOX_DISPLAY_FEATURES = (
+    ["A_" + item for item in BASIC]
+    + ["A_" + item for item in ADVANCED]
+    + ["H_" + item for item in BASIC]
+    + ["H_" + item for item in ADVANCED]
+)
+
 MATCHUP_FEATURES = [
     "PTS",
     "AST",

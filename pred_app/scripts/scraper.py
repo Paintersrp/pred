@@ -33,10 +33,11 @@ class Scraper:
         #  Game start times were not included on the schedule table until 2001
         if len(data.columns) == 10:
             data.drop(data.columns[[5, 7, 8, 9]], axis=1, inplace=True)
+            data.columns = ["Date", "Away", "A-Pts", "Home", "H-Pts", "OT"]
         else:
             data.drop(data.columns[[6, 8, 9, 10]], axis=1, inplace=True)
+            data.columns = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT"]
 
-        data.columns = ["Date", "Time", "Away", "A-Pts", "Home", "H-Pts", "OT"]
         data["OT"] = data["OT"].str.replace("Unnamed: 7", "")
         data["Date"] = pd.to_datetime(data["Date"])
 
@@ -44,7 +45,11 @@ class Scraper:
         played = self.__set_extras(played)
 
         upcoming = data[data["H-Pts"] == ""]
-        upcoming.drop(upcoming.columns[[3, 5, 6]], axis=1, inplace=True)
+
+        if len(data.columns) == 6:
+            upcoming.drop(upcoming.columns[[2, 4, 5]], axis=1, inplace=True)
+        else:
+            upcoming.drop(upcoming.columns[[3, 5, 6]], axis=1, inplace=True)
 
         return played, upcoming
 
@@ -93,6 +98,8 @@ class Scraper:
     def get_boxscore_data_from_sch(
         self,
         data: pd.DataFrame,
+        save: bool = False,
+        file_name: str = None,
     ) -> pd.DataFrame:
         """
         Retrieves boxscore data for every game in a given schedule
@@ -153,7 +160,9 @@ class Scraper:
         averages = pd.DataFrame(list(map(np.ravel, final)))
 
         final = pd.concat([data, averages], axis=1, join="outer")
-        final.to_csv("BoxscoreData_2008.csv", index=None)
+
+        if save:
+            final.to_csv(f"{file_name}.csv", index=None)
 
         return final
 

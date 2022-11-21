@@ -11,7 +11,7 @@ from scripts.ratings import get_massey, adjust_elo, update_elo_new_season
 
 def initialize_training() -> None:
     """
-    Func
+    Initializes training dataset from backups/hardcopies
     """
 
     data = combine_datasets()
@@ -55,6 +55,7 @@ def set_extras(data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Season ID and MOV columns
     """
+
     data["Date"] = pd.to_datetime(data["Date"])
 
     for i in data.index:
@@ -73,7 +74,7 @@ def set_extras(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def clean_train(data) -> pd.DataFrame:
+def clean_train(data: pd.DataFrame) -> pd.DataFrame:
     """
     Cleans the raw scraped file for training the model
     Adds Massey/Elo Ratings to Raw Data
@@ -96,7 +97,8 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     #  pylint: disable=too-many-locals
     """
     Calculates Massey Ratings for all seasons in Training File
-    Concats Massey Ratings to provided file (usually schedule or raw stats)
+
+    Concats Massey Ratings to input dataset
     """
 
     data = pd.read_sql_table("full_sch", const.ENGINE)
@@ -157,6 +159,7 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
     """
     Adds Elo to the file containing the full schedule (2008-2022)
     """
+
     data = pd.read_sql_table("full_sch", const.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
@@ -212,14 +215,14 @@ def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
 
 
 def commit_train(data) -> None:
-    """Func"""
+    """Commits initial training dataset to database"""
 
     data.to_sql("training_data", const.ENGINE, if_exists="replace", index=False)
 
 
 def initialize_odds() -> None:
     """
-    Func
+    Initializes odds dataset from backups/hardcopies
     """
 
     data = combine_odds_dataset()
@@ -337,15 +340,12 @@ def clean_odds_data(data: pd.DataFrame) -> pd.DataFrame:
     )
     data["Spread_Outcome"] = np.where(data["MOV"] > data["Spread"], 1, 0)
 
-    # mask = (data["Spread"].astype(float) != 0) & (data["O/U"].astype(float) != 0)
-    # data = data.loc[mask].reset_index(drop=True)
-
     return data
 
 
 def commit_full_odds_initial(odds_data: pd.DataFrame) -> None:
     """
-    Yar
+    Commits initial odds dataset to database
     """
 
     odds_data.to_sql(
@@ -362,6 +362,8 @@ def initial_odds_stats(data: pd.DataFrame) -> None:
     Purpose
     ----------
     Builds odds stats table
+
+    Don't hate, appreciate.
 
     Notable variables:
         fav_count:
@@ -405,6 +407,7 @@ def initial_odds_stats(data: pd.DataFrame) -> None:
 
     Commits initial odds stats table to database
     """
+
     final_arr = []
     team_list = data["H_Team"].unique()
 
@@ -513,7 +516,7 @@ def initial_odds_stats(data: pd.DataFrame) -> None:
 
 def initial_sim_pred():
     """
-    Func
+    Initializes simulation dataset
     """
 
     data_handler = handler.GeneralHandler()
@@ -549,9 +552,9 @@ def initial_sim_pred():
     )
 
 
-def build_sim_random_data(data: pd.DataFrame) -> pd.DataFrame:
+def initialize_sim_random_data(data: pd.DataFrame) -> pd.DataFrame:
     """
-    Yar
+    Initializes simulation dataset (Random Variant)
     """
 
     sch_data = pd.read_sql_table("simulator_sch", const.ENGINE)
@@ -575,32 +578,23 @@ def build_sim_random_data(data: pd.DataFrame) -> pd.DataFrame:
 
 def initialize_boxscore_data() -> None:
     """
-    Func
+    Initializes boxscore dataset into database
     """
 
-    datasets = (
-        pd.read_csv("BoxscoreData_2008.csv"),
-        pd.read_csv("BoxscoreData_2009.csv"),
-        pd.read_csv("BoxscoreData_2010.csv"),
-        pd.read_csv("BoxscoreData_2011.csv"),
-        pd.read_csv("BoxscoreData_2012.csv"),
-        pd.read_csv("BoxscoreData_2013.csv"),
-        pd.read_csv("BoxscoreData_2014.csv"),
-        pd.read_csv("BoxscoreData_2015.csv"),
-        pd.read_csv("BoxscoreData_2016.csv"),
-        pd.read_csv("BoxscoreData_2017.csv"),
-        pd.read_csv("BoxscoreData_2018.csv"),
-        pd.read_csv("BoxscoreData_2019.csv"),
-        pd.read_csv("BoxscoreData_2020.csv"),
-        pd.read_csv("BoxscoreData_2021.csv"),
-        pd.read_csv("BoxscoreData_2022.csv"),
-    )
+    datasets = []
+    year_range = range(2008, 2023)
+
+    for year in year_range:
+        datasets.append(pd.read_csv(f"BoxscoreData_{year}.csv"))
 
     final = pd.concat(datasets, axis=0, join="outer").reset_index(drop=True)
     final.columns = final.columns
     final = final.drop(final.columns[[10, 29, 30, 42, 45, 46, 65, 66, 78, 81]], axis=1)
     final.columns = const.BOX_FEATURES
-    final.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
+    final[const.BOX_DISPLAY_FEATURES] = final[const.BOX_DISPLAY_FEATURES].astype(float)
+
+    print(final)
+    # final.to_sql("boxscore_data", const.ENGINE, if_exists="replace", index=False)
 
     return final
 

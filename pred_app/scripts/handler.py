@@ -66,51 +66,6 @@ class Handler:
             self.data = self.slot_three.copy()
             self.loaded = self.slot_three.copy()
 
-    def concat_to_stowed(
-        self, slot: int = 1, stowed_first: bool = False, axis: int = 0
-    ) -> None:
-        """
-        Concats current data to a stowed dataset
-
-        Data should match in length or shape, depending on axis
-
-        Slots available: 3
-        """
-
-        self.__slot_check(slot)
-        self.__concat_check(stowed_first, axis)
-
-        if not stowed_first:
-            if slot == 1:
-                self.data = pd.concat(
-                    [self.data, self.slot_one], axis=axis
-                ).reset_index(drop=True)
-
-            elif slot == 2:
-                self.data = pd.concat(
-                    [self.data, self.slot_two], axis=axis
-                ).reset_index(drop=True)
-
-            elif slot == 3:
-                self.data = pd.concat(
-                    [self.data, self.slot_three], axis=axis
-                ).reset_index(drop=True)
-        else:
-            if slot == 1:
-                self.data = pd.concat(
-                    [self.slot_one, self.data], axis=axis
-                ).reset_index(drop=True)
-
-            elif slot == 2:
-                self.data = pd.concat(
-                    [self.slot_two, self.data], axis=axis
-                ).reset_index(drop=True)
-
-            elif slot == 3:
-                self.data = pd.concat(
-                    [self.slot_three, self.data], axis=axis
-                ).reset_index(drop=True)
-
     def print_data(self) -> None:
         """Prints currently loaded data"""
 
@@ -134,16 +89,36 @@ class Handler:
     def sort_columns(self, column: t.Any, ascending: bool) -> None:
         """Sorts given column"""
 
-        self.data.sort_values(column, ascending=ascending, inplace=True)
-        self.data.reset_index(drop=True, inplace=True)
+        self.data = self.data.sort_values(column, ascending=ascending).reset_index(
+            drop=True
+        )
 
-    def filter_columns(self, column, value) -> None:
-        """Filters a column by a value"""
+    def filter_columns(self, column: list, value: t.Any, mode: int) -> None:
+        """
+        Filters a column by a value
 
-        mask = self.data[column] == value
-        self.data = self.data.loc[mask].reset_index(drop=True)
+        Mode 1 (Equals)
 
-    def filter_date_range(self, column, start_date, end_date) -> None:
+        Mode 2 (Greater Than)
+
+        Mode 3 (Less Than)
+        """
+
+        self.__mode_check(mode)
+
+        if mode == 1:
+            mask = self.data[column] == value
+            self.data = self.data.loc[mask].reset_index(drop=True)
+        elif mode == 2:
+            mask = self.data[column] > value
+            self.data = self.data.loc[mask].reset_index(drop=True)
+        elif mode == 3:
+            mask = self.data[column] < value
+            self.data = self.data.loc[mask].reset_index(drop=True)
+
+    def filter_date_range(
+        self, column: list, start_date: t.Any, end_date: t.Any
+    ) -> None:
         """Filters date column by start and end date range"""
 
         start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -158,7 +133,7 @@ class Handler:
 
         print(*self.data.columns)
 
-    def rename_columns(self, new_columns_dict: dict):
+    def rename_columns(self, new_columns_dict: dict) -> None:
         """Renames columns in current data based on given dict"""
 
         self.data = self.data.rename(columns=new_columns_dict)
@@ -170,26 +145,40 @@ class Handler:
             self.data.columns.drop(list(self.data.filter(regex=f"{regex_str}")))
         ]
 
-    def to_csv(self, file_name) -> None:
+    def preset_filter(self, training: bool, boxscore: bool = False) -> None:
+        """Func"""
+
+        if training:
+            self.data = self.data[["Home", "Away"] + const.NET_FULL_FEATURES]
+            self.data.columns = self.data.columns.str.replace("_PCT", "%")
+            self.data.columns = self.data.columns.str.replace("_RATIO", "_R")
+        elif boxscore:
+            self.data = self.data[["Home", "Away"] + const.BOX_DISPLAY_FEATURES]
+            self.data[const.BOX_DISPLAY_FEATURES] = self.data[
+                const.BOX_DISPLAY_FEATURES
+            ].astype(float)
+
+    def groupby_averages(self, column: list) -> None:
+        """Func"""
+
+        self.data = self.data.groupby(column).agg(np.mean)
+
+    def to_csv(self, file_name: str) -> None:
         """Exports current data to .csv file"""
 
         self.data.to_csv(f"{file_name}.csv", index=None)
 
-    def __slot_check(self, slot) -> None:
-        """Func"""
+    def __slot_check(self, slot: int) -> None:
+        """Raises errors given bad input for parameter: slot"""
 
         if slot > 3 or slot < 0:
             raise ValueError(f"Choose from slot 1, 2, or 3. Slot received: {slot}")
 
-    def __concat_check(self, stowed_first, axis) -> None:
-        """Func"""
+    def __mode_check(self, mode: int) -> None:
+        """Raises errors given bad input for parameter: slot"""
 
-        if not isinstance(stowed_first, bool):
-            raise ValueError(
-                f"Stowed First must be boolean - True/False. Type received: {type(stowed_first)}"
-            )
-        if not axis == 0 or not axis == 1:
-            raise ValueError(f"Axis must be 0 or 1. Axis received: {axis}")
+        if mode > 3 or mode < 0:
+            raise ValueError(f"Choose from mode 1, 2, or 3. Mode received: {mode}")
 
 
 class GeneralHandler(Handler):
@@ -240,8 +229,13 @@ class GeneralHandler(Handler):
 
         return pd.read_sql_table("prediction_history_massey", const.ENGINE)
 
-    def schedule_by_year(self, year) -> pd.DataFrame:
+    def schedule_by_year(self, year: int) -> pd.DataFrame:
         """Returns schedule of completed games for given year"""
+
+        if pd.read_sql_table(f"{year}_played_games", const.ENGINE) is None:
+            raise ValueError(
+                f"SQL Datatable not found. Table name received: {year}_played_games"
+            )
 
         return pd.read_sql_table(f"{year}_played_games", const.ENGINE)
 
@@ -270,6 +264,16 @@ class GeneralHandler(Handler):
 
         return pd.read_sql_table("prediction_scoring", const.ENGINE)
 
+    def upcoming_schedule_by_year(self, year: int) -> pd.DataFrame:
+        """Returns most up-to-date upcoming schedule"""
+
+        if pd.read_sql_table(f"{year}_upcoming_games", const.ENGINE) is None:
+            raise ValueError(
+                f"SQL Datatable not found. Table name received: {year}_upcoming_games"
+            )
+
+        return pd.read_sql_table(f"{year}_upcoming_games", const.ENGINE)
+
 
 class TeamsHandler(Handler):
     #  pylint: disable=too-many-instance-attributes
@@ -287,7 +291,7 @@ class TeamsHandler(Handler):
 
         return dicts.season_map[year]
 
-    def return_averages(self, team_name: str) -> t.Any:
+    def return_averages(self, team_name: str) -> pd.DataFrame:
         """
         Returns team stat averages of given team
         """
@@ -319,7 +323,7 @@ class TeamsHandler(Handler):
 
         return round(final_avgs, 3)
 
-    def filter_data_by_year(self, year: int):
+    def filter_data_by_year(self, year: int) -> None:
         """
         Filters data to given year
         """
@@ -328,7 +332,9 @@ class TeamsHandler(Handler):
         mask = self.data["SeasonID"] == season
         self.data = self.data.loc[mask].reset_index(drop=True)
 
-    def filter_data_by_range(self, start_year: int = 2021, end_year: int = 2022):
+    def filter_data_by_range(
+        self, start_year: int = 2021, end_year: int = 2022
+    ) -> None:
         """
         Filters data to given range of years
         """
@@ -344,7 +350,7 @@ class TeamsHandler(Handler):
 
         self.data = pd.concat(raw_data).reset_index(drop=True)
 
-    def return_head_to_head(self, team_one: str, team_two: str):
+    def return_head_to_head(self, team_one: str, team_two: str) -> pd.DataFrame:
         """
         Compares two teams head-to-head match up averages over last 5 meetings
         """
@@ -360,7 +366,9 @@ class TeamsHandler(Handler):
 
         self.data = pd.concat([t1_final, t2_final]).reset_index(drop=True)
 
-    def return_team_compare(self, home_team: str, away_team: str) -> None:
+        return self.data
+
+    def return_team_compare(self, home_team: str, away_team: str) -> pd.DataFrame:
         """
         Builds table of two given team's current averages
         """
@@ -449,12 +457,12 @@ class OddsHandler(Handler):
         self.data = pd.read_sql_table("odds_stats", const.ENGINE)
         self.grouped = self.data.groupby("Team")
 
-    def team_odds_averages(self, team_name) -> t.Any:
+    def team_odds_averages(self, team_name: str) -> t.Any:
         """Returns given team's current odds stats"""
 
         return self.grouped.get_group(team_name)
 
-    def team_odds_compare(self, team_one: str, team_two: str):
+    def team_odds_compare(self, team_one: str, team_two: str) -> pd.DataFrame:
         """Returns two given team's current odds stats for comparison"""
 
         t1_final = self.grouped.get_group(team_one)
@@ -474,7 +482,7 @@ class MetricsHandler(Handler):
         super().__init__()
 
     def today_preds(self) -> pd.DataFrame:
-        """Returns today' predictions table"""
+        """Returns today's predictions table"""
 
         return pd.read_sql_table("today_preds", const.ENGINE)
 

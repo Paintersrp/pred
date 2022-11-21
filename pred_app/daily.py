@@ -7,7 +7,6 @@ from scripts.updater import Updater
 from scripts.predictor import DailyPredictor
 from scripts.handler import MetricsHandler
 
-
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
