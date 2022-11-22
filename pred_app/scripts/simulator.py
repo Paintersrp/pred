@@ -1,5 +1,5 @@
 """
-WIP
+This module contains Betting Simulator Classes and Methods
 """
 import pickle
 import pandas as pd
@@ -107,19 +107,25 @@ class Simulator:
         self.net_total = self.value_won - abs(self.value_lost)
         self.ratio = round(self.value_won / abs(self.value_lost) * 100, 2)
 
-    def return_totals(self) -> tuple[float, float, float, float]:
+    def return_totals(self) -> pd.DataFrame:
         """
         Returns
         ---------
         Value Won, Value Lost, Net Total, and Earned/Lost Ratio
         """
 
-        return (
-            round(self.value_won, 2),
-            round(self.value_lost, 2),
-            round(self.net_total, 2),
-            str(self.ratio) + "%",
-        )
+        totals = pd.DataFrame(
+            [
+                round(self.value_won, 2),
+                round(self.value_lost, 2),
+                round(self.net_total, 2),
+                str(self.ratio) + "%",
+            ]
+        ).T
+
+        totals.columns = ["Earned", "Lost", "Net", "Ratio"]
+
+        return totals
 
     def best_wins(self) -> pd.DataFrame:
         """
@@ -169,11 +175,12 @@ class Simulator:
         Save current dataset to CSV file
         """
 
-        return_data = pd.DataFrame(list(self.return_totals())).T
-        return_data.columns = ["Won", "Lost", "Net", "Ratio"]
-        final_data = pd.concat(
-            [return_data, self.data], axis=1, join="outer"
-        ).reset_index(drop=True)
+        totals = self.return_totals()
+
+        final_data = pd.concat([totals, self.data], axis=1, join="outer").reset_index(
+            drop=True
+        )
+
         final_data.to_csv(f"{file_name}.csv", index=None)
 
     def save_sim(self, file_name: str) -> None:
@@ -392,7 +399,7 @@ class SimAdvanced(SimPredictor):
         self.lean_in = lean_in
         self.lean_out = lean_out
 
-        self.lean_out_min = 500
+        self.lean_out_min = 200
         self.lean_out_max = 10000
         self.lean_in_min = 110
         self.lean_in_max = 150
@@ -436,19 +443,19 @@ class SimAdvanced(SimPredictor):
 
         for i in self.data.index:
             if self.lean_out_min <= abs(self.data.at[i, "A_ML"]) <= self.lean_out_max:
-                if self.lean_in:
-                    rule_col.append("Lean-In")
+                if self.lean_out:
+                    rule_col.append("Lean-Out")
                     bet_col.append(self.bet_value * 0.01)
                 else:
-                    rule_col.append("Lean-In")
+                    rule_col.append("Lean-Out")
                     bet_col.append(self.bet_value)
 
             elif self.lean_in_min <= abs(self.data.at[i, "A_ML"]) <= self.lean_in_max:
-                if self.lean_out:
-                    rule_col.append("Lean-Out")
+                if self.lean_in:
+                    rule_col.append("Lean-In")
                     bet_col.append(self.bet_value * 2)
                 else:
-                    rule_col.append("Lean-Out")
+                    rule_col.append("Lean-In")
                     bet_col.append(self.bet_value)
             else:
                 rule_col.append("None")
@@ -477,7 +484,7 @@ class SimAdvanced(SimPredictor):
         self.calculate()
         self.unadjusted_score = self.return_totals()
 
-    def __check_parameters(self, lean_in: bool, lean_out: int) -> None:
+    def __check_parameters(self, lean_in: bool, lean_out: bool) -> None:
         """
         Parameter error handling
         """
@@ -489,7 +496,7 @@ class SimAdvanced(SimPredictor):
 
         if not isinstance(lean_in, bool):
             raise ValueError(
-                f"Lean In must be True or False. State Received: {lean_in}"
+                f"Lean In must be True or False. Value Received: {lean_in}"
             )
 
         if isinstance(lean_out, str):
@@ -499,7 +506,7 @@ class SimAdvanced(SimPredictor):
 
         if not isinstance(lean_out, bool):
             raise ValueError(
-                f"Lean Out must be True or False. State Received: {lean_out}"
+                f"Lean Out must be True or False. Value Received: {lean_out}"
             )
 
     def __check_rule_parameters(
