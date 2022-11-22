@@ -128,6 +128,15 @@ class Handler:
         mask = (self.data[column] >= start_date) & (self.data[column] <= end_date)
         self.data = self.data.loc[mask].reset_index(drop=True)
 
+    def filter_season(
+        self,
+        season_id: str,
+    ) -> None:
+        """Filters date column by start and end date range"""
+
+        mask = self.data["SeasonID"] == season_id
+        self.data = self.data.loc[mask].reset_index(drop=True)
+
     def print_columns(self) -> None:
         """Prints a list of columns in current data"""
 

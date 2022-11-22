@@ -34,8 +34,6 @@ DATAHANDLER = handler.GeneralHandler()
 class Predictor:
     #  pylint: disable=too-many-instance-attributes
     """
-    Base Predictor class
-
     Contains methods for scoring and manipulating Prediction models
     """
 
@@ -59,6 +57,7 @@ class Predictor:
         self.train_data = DATAHANDLER.pred_sim_data()
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data
+        self.net_data.drop(["Pred"], axis=1, inplace=True)
         self.sim_mode = True
 
     def test_model(

@@ -4,9 +4,7 @@ This module contains Betting Simulator Classes and Methods
 import pickle
 import pandas as pd
 import numpy as np
-from scripts import const
-from scripts import predictor
-from scripts import handler
+from scripts import const, predictor, handler
 
 
 class Simulator:

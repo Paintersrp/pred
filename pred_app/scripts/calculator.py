@@ -146,7 +146,7 @@ class Calculator:
 
     def calc_hedge(
         self, original_wager: float, original_odds: t.Any, hedge_odds: t.Any
-    ) -> tuple[float, float]:
+    ) -> tuple[float, float, float]:
         """
         Calculates prevent loss wager, maximize hedge wager, and guaranteed return of hedge
         """
@@ -159,37 +159,31 @@ class Calculator:
             if hedge_odds > 0:
                 hedge_odds = (hedge_odds / 100) + 1
                 prevent_loss = original_wager / hedge_odds
-
             else:
                 hedge_odds = (100 / abs(hedge_odds)) + 1
                 prevent_loss = original_wager / hedge_odds
 
-        elif self.fractional:
-            split_value = str(hedge_odds).split("/")
-            hedge_odds = (float(split_value[0]) / float(split_value[1])) + 1
-            prevent_loss = original_wager / hedge_odds
-
-        else:
-            prevent_loss = original_wager / hedge_odds
-
-        if self.moneyline:
             if original_odds > 0:
                 original_odds = (original_odds / 100) + 1
                 original_profit = (original_wager * original_odds) - original_wager
                 maximize_hedge = (original_profit + original_wager) / hedge_odds
-
             else:
                 original_odds = (100 / abs(original_odds)) + 1
                 original_profit = (original_wager * original_odds) - original_wager
                 maximize_hedge = (original_profit + original_wager) / hedge_odds
 
         elif self.fractional:
-            split_value = str(original_odds).split("/")
-            original_odds = (float(split_value[0]) / float(split_value[1])) + 1
+            split_hedge = str(hedge_odds).split("/")
+            hedge_odds = (float(split_hedge[0]) / float(split_hedge[1])) + 1
+            prevent_loss = original_wager / hedge_odds
+
+            split_orig = str(original_odds).split("/")
+            original_odds = (float(split_orig[0]) / float(split_orig[1])) + 1
             original_profit = (original_wager * original_odds) - original_wager
             maximize_hedge = (original_profit + original_wager) / hedge_odds
 
         else:
+            prevent_loss = original_wager / hedge_odds
             original_profit = (original_wager * original_odds) - original_wager
             maximize_hedge = (original_profit + original_wager) / hedge_odds
 

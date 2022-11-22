@@ -538,6 +538,7 @@ def initial_sim_pred():
                 training_data.at[i, "H_ML"] = temp.at[j, "H_ML"]
                 training_data.at[i, "A_ML"] = temp.at[j, "A_ML"]
                 training_data.at[i, "Spread"] = temp.at[j, "Spread"]
+                training_data.at[i, "OU_Outcome"] = temp.at[j, "O/U_Outcome"]
 
     training_data.sort_values(["Date", "Home"], ascending=True, inplace=True)
     training_data.reset_index(drop=True, inplace=True)
@@ -546,6 +547,8 @@ def initial_sim_pred():
         training_data["O/U"].astype(float) != 0
     )
     training_data = training_data.loc[mask].reset_index(drop=True)
+
+    print(training_data)
 
     training_data.to_sql(
         "sim_pred_data", const.ENGINE, if_exists="replace", index=False

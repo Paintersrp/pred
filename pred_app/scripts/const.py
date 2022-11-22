@@ -145,8 +145,27 @@ SIM_PRED_FEATURES = NET_FULL_FEATURES + ["O/U", "H_ML", "A_ML", "Spread"]
 SIM_PRED_DISPLAY_FEATURES = (
     ["Date", "Away", "Home", "SeasonID", "MOV", "Outcome"]
     + NET_FULL_FEATURES
-    + ["Pred", "O/U", "H_ML", "A_ML", "Spread"]
+    + ["Pred", "O/U", "H_ML", "A_ML", "Spread", "OU_Outcome"]
 )
+
+ANALYZER_FEATURES = [
+    "Odds Group",
+    "Count",
+    "Pred_W",
+    "Pred_L",
+    "Pred_W%",
+    "Bookie_W",
+    "Bookie_L",
+    "Bookie_W%",
+    "Net",
+    "Over%",
+    "Under%",
+    "Spread_W%",
+    "Spread_L%",
+]
+
+HOME_ANALYZER_FEATURES = ["H_" + item for item in ANALYZER_FEATURES]
+AWAY_ANALYZER_FEATURES = ["A_" + item for item in ANALYZER_FEATURES]
 
 """
 add notes
