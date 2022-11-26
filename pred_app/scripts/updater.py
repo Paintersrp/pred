@@ -13,7 +13,7 @@ from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
 from scripts.scraper import Scraper
-from scripts.handler import GeneralHandler
+from scripts.handler import GeneralHandler, MetricsHandler
 from scripts.initialize import clean_odds_data
 
 DATAHANDLER = GeneralHandler()
@@ -86,6 +86,7 @@ class Updater:
         team_stats["Record"] = team_stats[["W", "L"]].apply(
             lambda row: "-".join(row.values.astype(str)), axis=1
         )
+
         team_stats.to_sql("team_stats", const.ENGINE, if_exists="replace", index=False)
         team_stats = team_stats.groupby("Team")
 
@@ -544,3 +545,31 @@ class Updater:
         data.to_sql(
             "current_odds_history", const.ENGINE, if_exists="replace", index=False
         )
+
+    def update_todays_lines(data: pd.DataFrame) -> None:
+        """
+        Updates todays lines and commits to database
+        """
+
+        # add todays preds to general handler?
+        dh = MetricsHandler()
+        todays_preds = dh.today_preds()
+        data = SCRAPER.get_todays_lines()
+        data = SCRAPER.clean_todays_lines(data)
+
+        for i in todays_preds.index:
+            for j in data.index:
+                if (
+                    data.at[j, "Home"] == todays_preds.at[i, "H_Team"]
+                    and data.at[j, "Away"] == todays_preds.at[i, "A_Team"]
+                ):
+                    todays_preds.at[i, "O/U"] = data.at[j, "A_OU"]
+                    todays_preds.at[i, "A_OU_Line"] = data.at[j, "A_OU_Line"]
+                    todays_preds.at[i, "H_OU_Line"] = data.at[j, "H_OU_Line"]
+                    todays_preds.at[i, "Spread"] = data.at[j, "A_Spread"]
+                    todays_preds.at[i, "A_Spr_Line"] = data.at[j, "A_Spread_Line"]
+                    todays_preds.at[i, "H_Spr_Line"] = data.at[j, "H_Spread_Line"]
+                    todays_preds.at[i, "A_ML"] = data.at[j, "A_ML"]
+                    todays_preds.at[i, "H_ML"] = data.at[j, "H_ML"]
+
+        data.to_sql("todays_lines", const.ENGINE, if_exists="replace", index=False)

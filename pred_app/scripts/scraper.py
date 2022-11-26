@@ -9,7 +9,7 @@ import numpy as np
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from bs4 import BeautifulSoup
 from tqdm import tqdm
-from scripts import const, dicts
+from scripts import const, dicts, utils
 
 
 class Scraper:
@@ -179,6 +179,7 @@ class Scraper:
             | (data["SeasonID"] == "2019-20")
             | (data["SeasonID"] == "2020-21")
             | (data["SeasonID"] == "2021-22")
+            | (data["SeasonID"] == "2022-23")
         )
         filtered = data.loc[mask].reset_index(drop=True)
 
@@ -277,9 +278,96 @@ class Scraper:
         averages = pd.DataFrame(list(map(np.ravel, full_arrays)), columns=features)
 
         final = pd.concat([filtered, averages], axis=1, join="outer")
-        final.to_csv("TrainDataRawAdv.csv", index=None)
+        # final.to_csv("TrainDataRawAdv.csv", index=None)
 
         return final
+
+    def get_todays_lines(self) -> pd.DataFrame:
+        """Scrapes today's lines into a DataFrame"""
+
+        full_data = []
+        temp = []
+
+        url = "https://sportsbook.draftkings.com/leagues/basketball/nba"
+        page = requests.get(url, timeout=60)
+        soup = BeautifulSoup(page.text, "html.parser")
+        table = soup.find(name="table", attrs={"class": "sportsbook-table"})
+        tr_list = table.find(name="tbody").find_all(name="tr")
+
+        for row in tr_list:
+            team_name = row.find(name="div", attrs={"class": "event-cell__name-text"})
+            team_name = utils.map_lines_team(team_name.text)
+            temp.append(team_name)
+            td_list = row.find_all(name="td")
+
+            for cell in td_list:
+                temp.append(cell.text)
+
+                if len(temp) == 8:
+                    full_data.append(temp)
+                    temp = []
+
+        final_data = pd.DataFrame(
+            full_data,
+            columns=[
+                "Away",
+                "A_Spread",
+                "A_OU",
+                "A_ML",
+                "Home",
+                "H_Spread",
+                "H_OU",
+                "H_ML",
+            ],
+        )
+
+        return final_data
+
+    def clean_todays_lines(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Cleans some columns into multiple data columns"""
+
+        split_values = []
+
+        for i in data.index:
+            away_spread = str(data.at[i, "A_Spread"]).split("−")  # intentional U+2212
+            home_spread = str(data.at[i, "H_Spread"]).split("−")
+
+            away_ou = str(data.at[i, "A_OU"]).split("\xa0")[1].split("−")
+
+            home_ou = str(data.at[i, "H_OU"]).split("\xa0")[1].split("−")
+
+            split_values.append(
+                [
+                    away_spread[0],
+                    away_spread[1],
+                    home_spread[0],
+                    home_spread[1],
+                    away_ou[0],
+                    away_ou[1],
+                    home_ou[0],
+                    home_ou[1],
+                ]
+            )
+
+        split_values = pd.DataFrame(
+            split_values,
+            columns=[
+                "A_Spread",
+                "A_Spread_Line",
+                "H_Spread",
+                "H_Spread_Line",
+                "A_OU",
+                "A_OU_Line",
+                "H_OU",
+                "H_OU_Line",
+            ],
+        )
+
+        data.drop(data[["A_Spread", "A_OU", "H_Spread", "H_OU"]], axis=1, inplace=True)
+
+        data = pd.concat([data, split_values], axis=1)
+
+        return data
 
     def clean_boxscore_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """

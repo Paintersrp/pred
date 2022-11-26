@@ -49,5 +49,13 @@ def map_odds_team(team: str) -> list:
     return dicts.odds_team_dict[team]
 
 
+def map_lines_team(team: str) -> list:
+    """
+    Returns season's months list for given year
+    """
+
+    return dicts.lines_team_dict[team]
+
+
 if __name__ == "__main__":
     pass

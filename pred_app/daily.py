@@ -36,6 +36,7 @@ if __name__ == "__main__":
     Updater.update_metrics(metrics_list)
     Updater.update_history(net_final, const.NET_FULL_FEATURES)
     Updater.update_preds(net_final)
+    Updater.update_todays_lines()
     Updater.update_full_stats()
     Updater.update_history_outcomes()
     Updater.update_upcoming()

@@ -283,6 +283,11 @@ class GeneralHandler(Handler):
 
         return pd.read_sql_table(f"{year}_upcoming_games", const.ENGINE)
 
+    def todays_line(self) -> pd.DataFrame:
+        """Returns most up-to-date daily lines"""
+
+        return pd.read_sql_table("todays_lines", const.ENGINE)
+
 
 class TeamsHandler(Handler):
     #  pylint: disable=too-many-instance-attributes

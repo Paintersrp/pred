@@ -25,11 +25,17 @@ class SimAnalyzer(Analyzer):
 
     def __init__(self) -> None:
         super().__init__()
+
         self.data = DATAHANDLER.pred_sim_data()
+
         self.__spread_status()
 
     def months_analysis(self) -> pd.DataFrame:
-        """Instantiates loop using months group filters and settings"""
+        """
+        Instantiates loop using months group filters and settings
+
+        Returns months analysis DataFrame
+        """
 
         team_groups = ["Date", "Date"]
         months_data, _ = self.__analysis_table_loop(
@@ -39,17 +45,44 @@ class SimAnalyzer(Analyzer):
         return months_data
 
     def teams_analysis(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Instantiates loop using teams group filters and settings"""
+        """
+        Instantiates loop using teams group filters and settings
+
+        Returns home analysis DataFrame, away analysis DataFrame
+        """
 
         team_groups = ["Home", "Away"]
-        h_teams_data, a_teams_data = self.__analysis_table_loop(
-            team_groups, False, False, True, False
-        )
+        home, away = self.__analysis_table_loop(team_groups, False, False, True, False)
 
-        return h_teams_data, a_teams_data
+        float_cols = const.AWAY_ANALYZER_FEATURES.copy()
+        float_cols.remove("Group")
+        home[float_cols] = home[float_cols].astype(float)
+        away[float_cols] = away[float_cols].astype(float)
+
+        sum_features = pd.DataFrame(
+            pd.concat([home, away])
+            .reset_index(drop=True)
+            .groupby("Group")[const.ANALYZER_SUM_FEATURES]
+            .agg(np.sum)
+        ).copy()
+        mean_features = pd.DataFrame(
+            pd.concat([home, away])
+            .reset_index(drop=True)
+            .groupby("Group")[const.ANALYZER_MEAN_FEATURES]
+            .agg(np.mean)
+        ).copy()
+        combined = pd.concat([sum_features, mean_features], axis=1)
+        combined.insert(0, "Group", combined.index)
+        combined.reset_index(drop=True, inplace=True)
+
+        return home, away, combined
 
     def rule_analysis(self) -> pd.DataFrame:
-        """Instantiates loop using rule group filters and settings"""
+        """
+        Instantiates loop using rule group filters and settings
+
+        Returns rules analysis DataFrame
+        """
 
         rule_groups = ["Rule", "Rule"]
         rule_data, _ = self.__analysis_table_loop(
@@ -59,7 +92,11 @@ class SimAnalyzer(Analyzer):
         return rule_data
 
     def moneyline_analysis(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Instantiates loop using moneyline group filters and settings"""
+        """
+        Instantiates loop using moneyline group filters and settings
+
+        Returns moneyline analysis DataFrame
+        """
 
         moneyline_groups = ["H_ML", "A_ML"]
 
@@ -205,11 +242,11 @@ class SimAnalyzer(Analyzer):
         )
 
         if not months_table:
-            h_data["H_Net"] = h_data["H_Net"].astype(float)
-            h_data = h_data.sort_values("H_Net", ascending=False).reset_index(drop=True)
+            h_data["Net"] = h_data["Net"].astype(float)
+            h_data = h_data.sort_values("Net", ascending=False).reset_index(drop=True)
 
-            a_data["A_Net"] = a_data["A_Net"].astype(float)
-            a_data = a_data.sort_values("A_Net", ascending=False).reset_index(drop=True)
+            a_data["Net"] = a_data["Net"].astype(float)
+            a_data = a_data.sort_values("Net", ascending=False).reset_index(drop=True)
 
         if months_table or rule_table:
             print(h_data)

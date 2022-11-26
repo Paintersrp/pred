@@ -4,7 +4,7 @@ from xgboost.sklearn import XGBClassifier
 
 """ SQLAlchemy Database Engine """
 
-ENGINE = create_engine("sqlite:///pred.db")
+ENGINE = create_engine("sqlite:///C:\\Python\\pred_app\\\\pred.db")
 
 """ Headers and URL for retrieving daily schedule """
 
@@ -149,7 +149,7 @@ SIM_PRED_DISPLAY_FEATURES = (
 )
 
 ANALYZER_FEATURES = [
-    "Odds Group",
+    "Group",
     "Count",
     "Pred_W",
     "Pred_L",
@@ -164,8 +164,26 @@ ANALYZER_FEATURES = [
     "Spread_L%",
 ]
 
-HOME_ANALYZER_FEATURES = ["H_" + item for item in ANALYZER_FEATURES]
-AWAY_ANALYZER_FEATURES = ["A_" + item for item in ANALYZER_FEATURES]
+HOME_ANALYZER_FEATURES = [item for item in ANALYZER_FEATURES]
+AWAY_ANALYZER_FEATURES = [item for item in ANALYZER_FEATURES]
+
+ANALYZER_SUM_FEATURES = [
+    "Count",
+    "Pred_W",
+    "Pred_L",
+    "Bookie_W",
+    "Bookie_L",
+    "Net",
+]
+
+ANALYZER_MEAN_FEATURES = [
+    "Pred_W%",
+    "Bookie_W%",
+    "Over%",
+    "Under%",
+    "Spread_W%",
+    "Spread_L%",
+]
 
 """
 add notes

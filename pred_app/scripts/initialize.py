@@ -74,26 +74,32 @@ def set_extras(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def clean_train(data: pd.DataFrame) -> pd.DataFrame:
+def clean_train(data: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
     """
     Cleans the raw scraped file for training the model
     Adds Massey/Elo Ratings to Raw Data
     """
 
-    data["Date"] = pd.to_datetime(data["Date"])
+    data["Date"] = pd.to_datetime(data["Date"]).dt.date
     data["Outcome"] = np.where(
         data["H-Pts"].astype(float) > data["A-Pts"].astype(float), 1, 0
     )
 
     data.drop(["Time", "A-Pts", "H-Pts", "OT"], axis=1, inplace=True)
 
-    data = add_massey(data)
+    massey = add_massey(schedule)
     # data = add_elo(data)
 
-    return data
+    final = pd.concat([data, massey], axis=1, join="outer")
+    final.drop(["A_TEAM_NAME", "H_TEAM_NAME"], axis=1, inplace=True)
+
+    final["A_Status"] = 0
+    final["H_Status"] = 1
+
+    return final
 
 
-def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
+def add_massey(data: pd.DataFrame) -> pd.DataFrame:
     #  pylint: disable=too-many-locals
     """
     Calculates Massey Ratings for all seasons in Training File
@@ -101,7 +107,7 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
     Concats Massey Ratings to input dataset
     """
 
-    data = pd.read_sql_table("full_sch", const.ENGINE)
+    # data = pd.read_sql_table("full_sch", const.ENGINE)
     data["Date"] = pd.to_datetime(data["Date"])
 
     check_date = date.today()
@@ -150,7 +156,6 @@ def add_massey(concat_to: pd.DataFrame) -> pd.DataFrame:
                     full_arrays.append(arr)
 
     final = pd.DataFrame(full_arrays, columns=["A_Massey", "H_Massey"])
-    final = pd.concat([concat_to, final], axis=1, join="outer")
 
     return final
 

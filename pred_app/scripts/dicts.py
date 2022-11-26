@@ -275,6 +275,40 @@ odds_team_dict = {
     "Washington": "Washington Wizards",
 }
 
+lines_team_dict = {
+    "ATL Hawks": "Atlanta Hawks",
+    "BOS Celtics": "Boston Celtics",
+    "BKN Nets": "Brooklyn Nets",
+    "CHA Hornets": "Charlotte Hornets",
+    "CHI Bulls": "Chicago Bulls",
+    "CLE Cavaliers": "Cleveland Cavaliers",
+    "DAL Mavericks": "Dallas Mavericks",
+    "DEN Nuggets": "Denver Nuggets",
+    "DET Pistons": "Detroit Pistons",
+    "GS Warriors": "Golden State Warriors",
+    "Houston": "Houston Rockets",
+    "IND Pacers": "Indiana Pacers",
+    "LA Clippers": "LA Clippers",
+    "LA Lakers": "Los Angeles Lakers",
+    "Memphis": "Memphis Grizzlies",
+    "MIA Heat": "Miami Heat",
+    "MIL Bucks": "Milwaukee Bucks",
+    "MIN Timberwolves": "Minnesota Timberwolves",
+    "NewJersey": "Brooklyn Nets",
+    "NO Pelicans": "New Orleans Pelicans",
+    "NewYork": "New York Knicks",
+    "OKC Thunder": "Oklahoma City Thunder",
+    "Orlando": "Orlando Magic",
+    "PHI 76ers": "Philadelphia 76ers",
+    "Phoenix": "Phoenix Suns",
+    "POR Trail Blazers": "Portland Trail Blazers",
+    "SAC Kings": "Sacramento Kings",
+    "SA Spurs": "San Antonio Spurs",
+    "TOR Raptors": "Toronto Raptors",
+    "UTA Jazz": "Utah Jazz",
+    "WAS Wizards": "Washington Wizards",
+}
+
 
 """
 The below section contains parameter grids for testing hyperparameters
