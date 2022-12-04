@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scripts import utils, const, handler
-from scripts.ratings import get_massey, adjust_elo, update_elo_new_season
+from scripts.ratings import get_massey, add_elo
 
 
 def initialize_training() -> None:
@@ -79,16 +79,15 @@ def clean_train(data: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
     Cleans the raw scraped file for training the model
     Adds Massey/Elo Ratings to Raw Data
     """
+    data["H-Pts"] = data["H-Pts"].astype(float)
+    data["A-Pts"] = data["A-Pts"].astype(float)
 
     data["Date"] = pd.to_datetime(data["Date"]).dt.date
-    data["Outcome"] = np.where(
-        data["H-Pts"].astype(float) > data["A-Pts"].astype(float), 1, 0
-    )
+    data["Outcome"] = np.where(data["H-Pts"] > data["A-Pts"], 1, 0)
 
+    data = add_elo(data, schedule)
     data.drop(["Time", "A-Pts", "H-Pts", "OT"], axis=1, inplace=True)
-
     massey = add_massey(schedule)
-    # data = add_elo(data)
 
     final = pd.concat([data, massey], axis=1, join="outer")
     final.drop(["A_TEAM_NAME", "H_TEAM_NAME"], axis=1, inplace=True)
@@ -156,65 +155,6 @@ def add_massey(data: pd.DataFrame) -> pd.DataFrame:
                     full_arrays.append(arr)
 
     final = pd.DataFrame(full_arrays, columns=["A_Massey", "H_Massey"])
-
-    return final
-
-
-def add_elo(concat_to: pd.DataFrame) -> pd.DataFrame:
-    """
-    Adds Elo to the file containing the full schedule (2008-2022)
-    """
-
-    data = pd.read_sql_table("full_sch", const.ENGINE)
-    data["Date"] = pd.to_datetime(data["Date"])
-
-    season = 0
-    full_arrays = []
-
-    for season in tqdm(data["SeasonID"].unique()):
-        filtered_data = data.loc[data["SeasonID"] == season].reset_index(drop=True)
-        filtered_data.drop(filtered_data.columns[[1, 6, 7, 8]], axis=1, inplace=True)
-
-        if season > 0:
-            current_elos = update_elo_new_season(current_elos)
-
-        else:
-            current_elos = (
-                np.ones(shape=(len(filtered_data["Away"].unique()))) * const.MEAN_ELO
-            )
-
-        map_df = filtered_data.drop(filtered_data.columns[[0, 2, 4]], axis=1)
-        teams = map_df.stack().unique()
-        teams.sort()
-        f_codes = pd.factorize(teams)
-        f_codes = pd.Series(f_codes[0], f_codes[1])
-        teams = map_df.stack().map(f_codes).unstack()
-
-        filtered_data["Outcome"] = np.where(
-            filtered_data["H-Pts"] > filtered_data["A-Pts"], 1, 0
-        )
-
-        final = pd.concat([teams, filtered_data["Outcome"]], axis=1, join="outer")
-
-        season += 1
-
-        for i in final.index:
-            arr = []
-
-            a_end_elo, h_end_elo = adjust_elo(
-                current_elos[final.at[i, "Away"]],
-                current_elos[final.at[i, "Home"]],
-                final.at[i, "Outcome"],
-            )
-
-            current_elos[final.at[i, "Away"]] = a_end_elo
-            current_elos[final.at[i, "Home"]] = h_end_elo
-
-            arr.extend([round(a_end_elo, 2), round(h_end_elo, 2)])
-            full_arrays.append(arr)
-
-    temp = pd.DataFrame(full_arrays, columns=["A_ELO", "H_ELO"])
-    final = pd.concat([concat_to, temp], axis=1, join="outer")
 
     return final
 

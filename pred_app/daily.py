@@ -6,6 +6,10 @@ from scripts import const
 from scripts.updater import Updater
 from scripts.predictor import DailyPredictor
 from scripts.handler import MetricsHandler
+from scripts.ratings import current_elos
+
+
+import sys
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -18,11 +22,13 @@ if __name__ == "__main__":
     games = Updater.update_games_json()
     daily_team_stats = Updater.update_team_stats()
     Updater.update_schedule()
-    ratings = Updater.update_massey()
+    Updater.update_training_schedule()
+    massey = Updater.update_massey()
+    elos = current_elos()
 
     #  Daily Predictor handles building and predicting daily games
 
-    DailyPredictor.build_test_data(games, daily_team_stats, ratings)
+    DailyPredictor.build_test_data(games, daily_team_stats, massey, elos)
     DailyPredictor.prepare_test_data()
     metrics_list = DailyPredictor.test_model(cv_count=1, loud=True)
     scores = DailyPredictor.feature_scoring()

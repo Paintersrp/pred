@@ -8,13 +8,14 @@ from collections import defaultdict
 import requests
 import pandas as pd
 import numpy as np
+import xgboost as xgb
 from bs4 import BeautifulSoup
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
 from scripts.scraper import Scraper
 from scripts.handler import GeneralHandler, MetricsHandler
-from scripts.initialize import clean_odds_data
+from scripts.initialize import clean_odds_data, clean_train
 
 DATAHANDLER = GeneralHandler()
 SCRAPER = Scraper()
@@ -253,22 +254,6 @@ class Updater:
 
         data["Game Time"] = data["Game Time"].str.split(" ").str[0]
 
-        # data.columns = [
-        #     [
-        #         "Win%",
-        #         "Net",
-        #         "Massey",
-        #         "Odds",
-        #         "Away Team",
-        #         "Time",
-        #         "Home Name",
-        #         "Odds.1",
-        #         "Massey.1",
-        #         "Net.1",
-        #         "Win%.1",
-        #     ]
-        # ]
-
         data.to_sql("today_preds", const.ENGINE, if_exists="replace", index=False)
 
     def update_boxscore_data(self) -> None:
@@ -322,7 +307,7 @@ class Updater:
 
         Returns dictionary of team lineup statuses
         """
-        url = "https://www.rotowire.com/basketball/nba-lineups.php"
+        url = const.INJURY_URL
 
         page = requests.get(url, timeout=60)
         soup = BeautifulSoup(page.text, "html.parser")
@@ -336,13 +321,18 @@ class Updater:
             for detail in lineup_list.find_all("li"):
                 player_name = detail.find("a")
                 status = detail.find("span")
+                status_check = detail.find(name="div", attrs={"style": "width:15px;"})
+                position = detail.find(name="div")
 
-                if player_name is not None and status is not None:
-                    injury_dict[team_names[i].text].append(
-                        (player_name.text + "-" + status.text.replace("GTD", "TBD"))
-                    )
-
-        print(injury_dict["ORL"])
+                if player_name is not None:
+                    if status_check is None:
+                        injury_dict[team_names[i].text].append(
+                            (player_name.text + "-" + position.text)
+                        )
+                    else:
+                        injury_dict[team_names[i].text].append(
+                            (player_name.text + "-" + status.text.replace("GTD", "TBD"))
+                        )
 
         return injury_dict
 
@@ -573,3 +563,216 @@ class Updater:
                     todays_preds.at[i, "H_ML"] = data.at[j, "H_ML"]
 
         data.to_sql("todays_lines", const.ENGINE, if_exists="replace", index=False)
+
+    def update_training_schedule(self):
+        DATAHANDLER = GeneralHandler()
+
+        schedule = DATAHANDLER.training_schedule()
+        played = DATAHANDLER.schedule_by_year(2023)
+
+        schedule["Date"] = pd.to_datetime(schedule["Date"]).dt.date
+        played["Date"] = pd.to_datetime(played["Date"]).dt.date
+
+        training_dates = schedule["Date"].unique()
+        new_dates = played["Date"].unique()
+
+        update_check = list(new_dates)
+
+        for game_date in new_dates:
+            if game_date in training_dates:
+                update_check.remove(game_date)
+
+        if not update_check:
+            print("Training schedule data is up-to-date.")
+        else:
+            mask = played["Date"] >= update_check[0]
+            games_to_update = played.loc[mask].reset_index(drop=True)
+
+            new_schedule = pd.concat(
+                [schedule, games_to_update], axis=0, join="outer"
+            ).reset_index(drop=True)
+
+            print(new_schedule)
+
+            new_schedule.to_sql(
+                "training_schedule", const.ENGINE, if_exists="replace", index=False
+            )
+
+    def update_training_data() -> None:
+        """
+        Loads previous training data and most recent list of played games
+
+        Compares games in both, filtering to only what's not in the database
+
+        Scrapes missing game data, committing to training data
+        """
+
+        DATAHANDLER = GeneralHandler()
+        SCRAPER = Scraper()
+
+        training = DATAHANDLER.training_data_v2()
+        played = DATAHANDLER.schedule_by_year(2023)
+
+        training["Date"] = pd.to_datetime(training["Date"]).dt.date
+        played["Date"] = pd.to_datetime(played["Date"]).dt.date
+
+        training_dates = training["Date"].unique()
+        new_dates = played["Date"].unique()
+
+        update_check = list(new_dates)
+
+        for game_date in new_dates:
+            if game_date in training_dates:
+                update_check.remove(game_date)
+
+        if not update_check:
+            print("Training data is up-to-date.")
+        else:
+            mask = played["Date"] >= update_check[0]
+            games_to_update = played.loc[mask].reset_index(drop=True)
+
+            new_data = SCRAPER.get_training_data_from_sch(games_to_update)
+            new_data = clean_train(new_data, games_to_update)
+            new_training = pd.concat(
+                [training, new_data], axis=0, join="outer"
+            ).reset_index(drop=True)
+
+            print(new_training)
+
+            new_training.to_sql(
+                "training_data_v3", const.ENGINE, if_exists="replace", index=False
+            )
+
+    #           NEEDS UPDATE TO ELO ADDITION VERSION
+    # def update_sim_pred(self):
+    #     DATAHANDLER = GeneralHandler()
+    #     SCRAPER = Scraper()
+
+    #     pred_data = DATAHANDLER.pred_sim_data()
+    #     played = DATAHANDLER.schedule_by_year(2023)
+
+    #     pred_data["Date"] = pd.to_datetime(pred_data["Date"]).dt.date
+    #     played["Date"] = pd.to_datetime(played["Date"]).dt.date
+
+    #     pred_dates = pred_data["Date"].unique()
+    #     new_dates = played["Date"].unique()
+
+    #     update_check = list(new_dates)
+
+    #     for game_date in new_dates:
+    #         if game_date in pred_dates:
+    #             update_check.remove(game_date)
+
+    #     if not update_check:
+    #         print("Sim Prediction Data is up-to-date.")
+
+    #     else:
+    #         mask = played["Date"] >= update_check[0]
+    #         games_to_update = played.loc[mask].reset_index(drop=True)
+    #         new_data = SCRAPER.get_training_data_from_sch(games_to_update)
+    #         new_data = clean_train(new_data, games_to_update)
+
+    #         new_preds = self.predict_new(pred_data, new_data)
+    #         new_data = pd.concat([new_data, new_preds], axis=1, join="outer").reset_index(
+    #             drop=True
+    #         )
+
+    #         new_data = self.clean_sim_pred(new_data)
+    #         new_data = self.add_analysis_columns(new_data)
+    #         new_pred_data = pd.concat([pred_data, new_data], axis=0, join="outer").reset_index(
+    #             drop=True
+    #         )
+
+    #         new_pred_data.to_sql(
+    #             "sim_pred_data", const.ENGINE, if_exists="replace", index=False
+    #         )
+
+    # def clean_sim_pred(self, data: pd.DataFrame) -> pd.DataFrame:
+    #     DATAHANDLER = GeneralHandler()
+
+    #     odds_history = DATAHANDLER.full_odds_history()
+
+    #     data["Date"] = pd.to_datetime(data["Date"]).dt.date
+    #     odds_history["Date"] = pd.to_datetime(odds_history["Date"]).dt.date
+
+    #     for i in data.index:
+    #         game_date = data.at[i, "Date"]
+
+    #         mask = odds_history["Date"] == game_date
+    #         temp = odds_history.loc[mask].reset_index(drop=True)
+
+    #         for j in temp.index:
+    #             if temp.at[j, "H_Team"] == data.at[i, "Home"]:
+    #                 data.at[i, "O/U"] = temp.at[j, "O/U"]
+    #                 data.at[i, "H_ML"] = temp.at[j, "H_ML"]
+    #                 data.at[i, "A_ML"] = temp.at[j, "A_ML"]
+    #                 data.at[i, "Spread"] = temp.at[j, "Spread"]
+    #                 data.at[i, "OU_Outcome"] = temp.at[j, "O/U_Outcome"]
+
+    #     data.sort_values(["Date", "Home"], ascending=True, inplace=True)
+    #     data.reset_index(drop=True, inplace=True)
+    #     data.dropna(inplace=True)
+    #     mask = (data["Spread"].astype(float) != 0) & (
+    #         data["O/U"].astype(float) != 0
+    #     )
+
+    #     data = data.loc[mask].reset_index(drop=True)
+    #     data = data[const.SIM_PRED_DISPLAY_FEATURES]
+
+    #     return data
+
+    # def add_analysis_columns(self, data: pd.DataFrame) -> pd.DataFrame:
+    #     rule_col = []
+    #     bet_col = []
+
+    #     for i in data.index:
+    #         if 200 <= abs(data.at[i, "A_ML"]) <= 10000:
+    #             rule_col.append("Lean-Out")
+    #             bet_col.append(1.00)
+
+    #         elif 110 <= abs(data.at[i, "A_ML"]) <= 150:
+    #             rule_col.append("Lean-In")
+    #             bet_col.append(100 * 2)
+
+    #         else:
+    #             rule_col.append("None")
+    #             bet_col.append(100)
+
+    #     data["Rule"] = rule_col
+    #     data["Bet"] = bet_col
+
+    #     data["ML_Payout"] = np.where(
+    #         data["MOV"] < 0, data["A_ML"], data["H_ML"]
+    #     )
+
+    #     data["Bet_Status"] = np.where(
+    #         data["Outcome"] == data["Pred"], 1, 0
+    #     )
+
+    #     data["Value"] = np.where(
+    #         data["Bet_Status"] == 1,
+    #         (100 / abs(data["ML_Payout"])) * data["Bet"],
+    #         -abs(100),
+    #     )
+
+    #     return data
+
+    # def predict_new(self, training: pd.DataFrame, testing: pd.DataFrame):
+    #     outcomes = training["Outcome"]
+    #     testing_outcomes = testing["Outcome"]
+    #     outcomes_arr = []
+
+    #     x_matrix = xgb.DMatrix(
+    #         training[const.NET_FULL_FEATURES], label=outcomes
+    #     )
+    #     y_matrix = xgb.DMatrix(
+    #         testing[const.NET_FULL_FEATURES], label=testing_outcomes
+    #     )
+
+    #     xgb_model = xgb.train(dicts.PARAMS, x_matrix, const.NET_EPOCHS)
+    #     preds = xgb_model.predict(y_matrix)
+
+    #     for pred in preds:
+    #         outcomes_arr.append(np.argmax(pred))
+
+    #     return pd.DataFrame(outcomes_arr, columns=["Pred"])

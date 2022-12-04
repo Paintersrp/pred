@@ -19,6 +19,7 @@ SCH_HEADER = {
 YEAR = "20" + date.today().strftime("%y")
 SCH_JSON_URL = f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{YEAR}/scores/00_todays_scores.json"  # pylint: disable=line-too-long
 ODDS_UPDATE_URL = f"https://sportsbookreviewsonline.com/scoresoddsarchives/nba/nba%20odds%202022-23.xlsx"
+INJURY_URL = "https://www.rotowire.com/basketball/nba-lineups.php"
 
 """ Curent epoch settings for model """
 
@@ -122,6 +123,7 @@ NET_FULL = [
     "PACE",
     "POSS",
     "PIE",
+    "ELO",
 ]
 
 TRUNC = ["FTA", "FTM"]
@@ -329,7 +331,8 @@ ODDS_COLS = ["Team", "Fav_W%", "UD_W%", "Cover%", "Under%", "Over%", "Def_W%", "
 
 MEAN_ELO = 1500
 ELO_WIDTH = 400
-K_FACTOR = 64
+K_FACTOR = 20.0
+HOME_ADVANTAGE = 100
 
 """ Constant feature sets used by Simulator  """
 

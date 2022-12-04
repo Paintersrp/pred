@@ -38,7 +38,7 @@ class Predictor:
     """
 
     def __init__(self):
-        self.train_data = DATAHANDLER.training_data()
+        self.train_data = DATAHANDLER.training_data_v2()
         self.outcomes = self.train_data["Outcome"]
         self.net_data = self.train_data[const.NET_FULL_FEATURES]
         self.model = None
@@ -244,10 +244,14 @@ class Predictor:
         """
 
         best = SelectKBest(score_func=f_classif, k="all")
-        fit = best.fit(self.net_data, self.outcomes)
+
+        # if self.net_data["Date"]:
+        #     data = self.net_data.drop(["Date"], axis=1, inplace=True)
+
+        fit = best.fit(self.net_data[const.NET_FULL_FEATURES], self.outcomes)
 
         temp = pd.DataFrame(fit.scores_)
-        columns = pd.DataFrame(self.net_data.columns)
+        columns = pd.DataFrame(self.net_data[const.NET_FULL_FEATURES].columns)
 
         scores = pd.concat([temp, columns], axis=1)
         scores.columns = ["Specs", "Score"]
@@ -387,8 +391,8 @@ class DailyPredictor(Predictor):
         self.features = None
 
     def build_test_data(
-        self, data: t.Any, team_stats: t.Any, massey_ratings: t.Any
-    ) -> pd.DataFrame:
+        self, data: t.Any, team_stats: t.Any, massey_ratings: t.Any, elo_ratings: dict
+    ) -> None:
         #  pylint: disable=too-many-locals
 
         """
@@ -442,6 +446,9 @@ class DailyPredictor(Predictor):
                 .head(1)["Massey"]
             )
 
+            home_elo = elo_ratings[home_team]
+            away_elo = elo_ratings[away_team]
+
             game = np.concatenate((away_stats, home_stats), axis=0)
             full_arrays.append(game)
 
@@ -451,6 +458,8 @@ class DailyPredictor(Predictor):
                     round(float(away_massey), 2),
                     round(float(home_massey), 2),
                     game_time,
+                    away_elo,
+                    home_elo,
                 ]
             )
 
@@ -466,12 +475,10 @@ class DailyPredictor(Predictor):
 
         rating_data = pd.DataFrame(
             ratings_array,
-            columns=["Date", "A_Massey", "H_Massey", "Game Time"],
+            columns=["Date", "A_Massey", "H_Massey", "Game Time", "A_ELO", "H_ELO"],
         )
 
         self.game_data = pd.concat([game_data, rating_data], axis=1, join="outer")
-
-        return self.game_data
 
     def prepare_test_data(
         self,
@@ -502,7 +509,9 @@ class DailyPredictor(Predictor):
             ]
         ]
 
-        self.test_data = self.game_data[self.features + ["A_Massey", "H_Massey"]]
+        self.test_data = self.game_data[
+            self.features + ["A_Massey", "H_Massey", "H_ELO", "A_ELO"]
+        ]
 
     def predict_today(
         self,

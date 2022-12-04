@@ -228,6 +228,16 @@ class GeneralHandler(Handler):
 
         return pd.read_sql_table("training_data", const.ENGINE)
 
+    def training_schedule(self) -> pd.DataFrame:
+        """Returns full model training data"""
+
+        return pd.read_sql_table("training_schedule", const.ENGINE)
+
+    def training_data_v2(self) -> pd.DataFrame:
+        """Returns full model training data"""
+
+        return pd.read_sql_table("training_data_v2", const.ENGINE)
+
     def prediction_history(self) -> pd.DataFrame:
         """Returns prediction history of Net focused model"""
 

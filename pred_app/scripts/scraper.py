@@ -329,25 +329,28 @@ class Scraper:
         split_values = []
 
         for i in data.index:
-            away_spread = str(data.at[i, "A_Spread"]).split("−")  # intentional U+2212
-            home_spread = str(data.at[i, "H_Spread"]).split("−")
+            if data.at[i, "A_OU"]:
+                away_spread = str(data.at[i, "A_Spread"]).split(
+                    "−"
+                )  # intentional U+2212
+                home_spread = str(data.at[i, "H_Spread"]).split("−")
+                away_ou = str(data.at[i, "A_OU"]).split("\xa0")[1].split("−")
+                home_ou = str(data.at[i, "H_OU"]).split("\xa0")[1].split("−")
 
-            away_ou = str(data.at[i, "A_OU"]).split("\xa0")[1].split("−")
-
-            home_ou = str(data.at[i, "H_OU"]).split("\xa0")[1].split("−")
-
-            split_values.append(
-                [
-                    away_spread[0],
-                    away_spread[1],
-                    home_spread[0],
-                    home_spread[1],
-                    away_ou[0],
-                    away_ou[1],
-                    home_ou[0],
-                    home_ou[1],
-                ]
-            )
+                split_values.append(
+                    [
+                        away_spread[0],
+                        away_spread[1],
+                        home_spread[0],
+                        home_spread[1],
+                        away_ou[0],
+                        away_ou[1],
+                        home_ou[0],
+                        home_ou[1],
+                    ]
+                )
+            else:
+                data.drop(data.index[i], inplace=True)
 
         split_values = pd.DataFrame(
             split_values,
