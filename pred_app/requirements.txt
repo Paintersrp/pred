@@ -1,6 +1,4 @@
 beautifulsoup4==4.11.1
-Flask==2.2.2
-flask_sqlalchemy==3.0.2
 matplotlib==3.6.1
 nba_api==1.1.13
 pandas==1.5.1
@@ -11,3 +9,5 @@ SQLAlchemy==1.4.42
 tqdm==4.59.0
 xgboost==1.6.2
 numpy==1.23.4
+dill==0.3.6
+openpyxl==3.0.10
