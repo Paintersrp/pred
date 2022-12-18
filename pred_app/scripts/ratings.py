@@ -11,9 +11,6 @@ from scripts import const
 import math
 
 
-import sys
-
-
 def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
     """
     Adds Elo to the file containing the full schedule (2008-2022)
@@ -62,29 +59,29 @@ def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
 
         season += 1
 
-        for i in final.index:
+        for idx in final.index:
             arr = []
 
-            if final.at[i, "Outcome"] == 0:
-                a_end_elo, h_end_elo = adjust_elo(
-                    current_elos[final.at[i, "Away"]],
-                    current_elos[final.at[i, "Home"]],
-                    final.at[i, "MOV"],
+            if final.at[idx, "Outcome"] == 0:
+                a_end_elo, h_end_elo, a_start_elo, h_start_elo = adjust_elo(
+                    current_elos[final.at[idx, "Away"]],
+                    current_elos[final.at[idx, "Home"]],
+                    final.at[idx, "MOV"],
                     0,
                 )
-                current_elos[final.at[i, "Away"]] = a_end_elo
-                current_elos[final.at[i, "Home"]] = h_end_elo
+                current_elos[final.at[idx, "Away"]] = a_end_elo
+                current_elos[final.at[idx, "Home"]] = h_end_elo
             else:
-                h_end_elo, a_end_elo = adjust_elo(
-                    current_elos[final.at[i, "Home"]],
-                    current_elos[final.at[i, "Away"]],
-                    final.at[i, "MOV"],
+                h_end_elo, a_end_elo, h_start_elo, a_start_elo = adjust_elo(
+                    current_elos[final.at[idx, "Home"]],
+                    current_elos[final.at[idx, "Away"]],
+                    final.at[idx, "MOV"],
                     1,
                 )
-                current_elos[final.at[i, "Home"]] = h_end_elo
-                current_elos[final.at[i, "Away"]] = a_end_elo
+                current_elos[final.at[idx, "Home"]] = h_end_elo
+                current_elos[final.at[idx, "Away"]] = a_end_elo
 
-            arr.extend([round(a_end_elo, 2), round(h_end_elo, 2)])
+            arr.extend([round(a_start_elo, 2), round(h_start_elo, 2)])
             full_arrays.append(arr)
 
     temp = pd.DataFrame(full_arrays, columns=["A_ELO", "H_ELO"])
@@ -175,7 +172,9 @@ def current_elos() -> dict:
 
         margin = abs(row.MOV)
 
-        new_w_elo, new_l_elo = adjust_elo(elo_dict[w], elo_dict[l], margin, home_win)
+        new_w_elo, new_l_elo, old_w_elo, old_l_elo = adjust_elo(
+            elo_dict[w], elo_dict[l], margin, home_win
+        )
 
         elo_dict[w] = new_w_elo
         elo_dict[l] = new_l_elo
@@ -202,7 +201,7 @@ def adjust_elo(
     new_w_elo = w_elo + elo_change
     new_l_elo = l_elo - elo_change
 
-    return new_w_elo, new_l_elo
+    return new_w_elo, new_l_elo, w_elo, l_elo
 
 
 def expected_outcome(elo_diff: float) -> float:

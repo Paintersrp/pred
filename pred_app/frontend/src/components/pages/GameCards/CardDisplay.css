@@ -1,0 +1,27 @@
+.layout {
+  background-color: #1c2237;
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
+}
+
+.container {
+  color: #fff;
+  padding: 40px 0px;
+  display: flex;
+  flex-direction: row;
+  gap: 48px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.disclaimer-align {
+  text-align: left;
+  align-items: left;
+}
+
+.date-head {
+  padding: 10px 0px !important;
+  width: 25% !important;
+  min-width: 250px;
+}

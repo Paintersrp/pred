@@ -2,6 +2,7 @@
 This module contains ML Model Predictor Classes and Methods
 """
 import pickle
+from datetime import date, timedelta
 import typing as t
 import numpy as np
 import pandas as pd
@@ -236,7 +237,7 @@ class Predictor:
 
         self.get_metrics(self.outcome_placeholder, self.outcomes_arr, loud)
 
-        return self.outcomes_arr
+        return self.outcomes_arr, preds
 
     def feature_scoring(self) -> pd.DataFrame:
         """
@@ -391,7 +392,10 @@ class DailyPredictor(Predictor):
         self.features = None
 
     def build_test_data(
-        self, data: t.Any, team_stats: t.Any, massey_ratings: t.Any, elo_ratings: dict
+        self,
+        team_stats: t.Any,
+        massey_ratings: t.Any,
+        elo_ratings: dict,
     ) -> None:
         #  pylint: disable=too-many-locals
 
@@ -420,17 +424,24 @@ class DailyPredictor(Predictor):
 
         full_arrays = []
         ratings_array = []
+        data = pd.read_sql_table(f"2023_upcoming_games", const.ENGINE)
+        data["Date"] = pd.to_datetime(data["Date"]).dt.date
 
-        for matchup in data:
+        data["Away"] = np.where(
+            data["Away"] == "Los Angeles Clippers", "LA Clippers", data["Away"]
+        )
+
+        data["Home"] = np.where(
+            data["Home"] == "Los Angeles Clippers", "LA Clippers", data["Home"]
+        )
+
+        for matchup in data.itertuples():
             massey = []
-            game_date = matchup.get("gcode").split("/")[0]
-            game_date = "-".join([game_date[:4], game_date[4:6], game_date[6:]])
-            game_time = matchup.get("stt")
+            game_date = matchup.Date
+            game_time = matchup.Time
 
-            home_line = matchup.get("h")
-            away_line = matchup.get("v")
-            home_team = home_line.get("tc") + " " + home_line.get("tn")
-            away_team = away_line.get("tc") + " " + away_line.get("tn")
+            home_team = matchup.Home
+            away_team = matchup.Away
             home_stats = team_stats.get_group(home_team)
             away_stats = team_stats.get_group(away_team)
 
@@ -513,7 +524,7 @@ class DailyPredictor(Predictor):
             self.features + ["A_Massey", "H_Massey", "H_ELO", "A_ELO"]
         ]
 
-    def predict_today(
+    def predict(
         self,
     ) -> pd.DataFrame:
 
@@ -562,4 +573,21 @@ class DailyPredictor(Predictor):
 
         final_data = pd.concat([self.team_data, pred_data], axis=1, join="outer")
 
-        return final_data
+        final_data.to_sql(
+            "upcoming_predictions", const.ENGINE, if_exists="replace", index=False
+        )
+
+        today_games = final_data.loc[(final_data["Date"] == date.today())].reset_index(
+            drop=True
+        )
+        tomorrow_games = final_data.loc[
+            (final_data["Date"] == date.today() + timedelta(days=1))
+        ].reset_index(drop=True)
+
+        final_data["Date"] = final_data["Date"].astype(str)
+        final_data.to_json(
+            "C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
+            orient="records",
+        )
+
+        return today_games, tomorrow_games

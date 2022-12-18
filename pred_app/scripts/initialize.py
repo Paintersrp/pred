@@ -15,9 +15,14 @@ def initialize_training() -> None:
     """
 
     data = combine_datasets()
-    commit_sch()
-    data = clean_train(data)
-    commit_train(data)
+    data.to_sql("training_base", const.ENGINE, if_exists="replace", index=False)
+    # commit_sch()
+    schedule = pd.read_sql_table("full_sch", const.ENGINE)
+    print(data)
+    print(schedule)
+    data = clean_train(data, schedule)
+    data.to_sql("training_base_elo", const.ENGINE, if_exists="replace", index=False)
+    # commit_train(data)
 
 
 def combine_datasets() -> pd.DataFrame:
@@ -87,15 +92,15 @@ def clean_train(data: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
 
     data = add_elo(data, schedule)
     data.drop(["Time", "A-Pts", "H-Pts", "OT"], axis=1, inplace=True)
-    massey = add_massey(schedule)
+    # massey = add_massey(schedule)
 
-    final = pd.concat([data, massey], axis=1, join="outer")
-    final.drop(["A_TEAM_NAME", "H_TEAM_NAME"], axis=1, inplace=True)
+    # final = pd.concat([data, massey], axis=1, join="outer")
+    data.drop(["A_TEAM_NAME", "H_TEAM_NAME"], axis=1, inplace=True)
 
-    final["A_Status"] = 0
-    final["H_Status"] = 1
+    data["A_Status"] = 0
+    data["H_Status"] = 1
 
-    return final
+    return data
 
 
 def add_massey(data: pd.DataFrame) -> pd.DataFrame:

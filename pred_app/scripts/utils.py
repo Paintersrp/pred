@@ -18,7 +18,8 @@ def timerun(function):
         time_2 = time.perf_counter()
         total = time_2 - time_1
         print(
-            f"Function {function.__name__} Took: {total:.4f} seconds ({total/60:.4f} minutes)"
+            "\n",
+            f"Function {function.__name__} Took: {total:.4f} seconds ({total/60:.4f} minutes)",
         )
         return result
 

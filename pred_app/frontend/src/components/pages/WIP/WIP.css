@@ -1,0 +1,15 @@
+.cl13 {
+  width: 80%;
+  background-color: yellow;
+  transform: translate3d(-300px, 20px, 2000px) rotateY(-180deg);
+  transition-property: all;
+  transition-duration: 0.5s;
+}
+.outer13 {
+  width: 90%;
+  height: 100px;
+  perspective: 2300px;
+}
+.outer13:hover > div {
+  transform: translate3d(0px, 0px, 100px);
+}

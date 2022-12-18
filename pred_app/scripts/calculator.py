@@ -2,7 +2,6 @@
 This module contains Betting Odds Calculator Classes and Methods
 """
 import typing as t
-import re
 import pandas as pd
 import numpy as np
 
@@ -72,65 +71,115 @@ class Calculator:
 
     def __init__(
         self,
-        decimal: bool = False,
-        fractional: bool = False,
-        moneyline: bool = False,
+        typeCheck: int = 1,
     ) -> None:
-        if decimal + fractional + moneyline > 1:
-            raise ValueError(
-                "Too many options enabled. Choose either decimal, fractional, or moneyline inputs"
-            )
+        self.decimal = False
+        self.moneyline = False
 
-        if decimal + fractional + moneyline == 0:
-            raise ValueError(
-                "No options enabled. Choose either decimal, fractional, or moneyline inputs"
-            )
+        if typeCheck == 1:
+            self.moneyline = True
+        elif typeCheck == 2:
+            self.decimal = True
 
-        self.__check_parameters(decimal, fractional, moneyline)
-        self.decimal = decimal
-        self.fractional = fractional
-        self.moneyline = moneyline
-
-    def calc_probability(self, line_value: t.Any) -> float:
-        """Calculates Implied Probability of given line"""
-
-        self.__check_line_value(line_value)
-
-        if self.decimal:
-            return (1 / line_value) * 100
+    def payout(self, wager: float, odds: int) -> float:
+        """Func"""
 
         if self.moneyline:
-            if line_value > 0:
-                return 100 / (line_value + 100) * 100
+            if odds > 0:
+                multiplier = (odds / 100) + 1
+            else:
+                multiplier = (100 / abs(odds)) + 1
 
-            if line_value < 0:
-                return abs(line_value) / (abs(line_value) + 100) * 100
+            final = wager * multiplier
 
-        if self.fractional:
-            split_value = str(line_value).split("/")
+        elif self.decimal:
+            final = wager * odds
+
+        return final
+
+    def convert_odds(self, odds: int) -> tuple[float, int, float]:
+        """Func"""
+
+        if self.moneyline:
+            if odds > 0:
+                print(odds)
+                american_final = odds
+                decimal_final = (odds / 100) + 1
+                implied_final = 100 / (odds + 100) * 100
+            else:
+                american_final = odds
+                decimal_final = (100 / abs(odds)) + 1
+                implied_final = abs(odds) / (abs(odds) + 100) * 100
+
             return (
-                float(split_value[1])
-                / (float(split_value[1]) + float(split_value[0]))
-                * 100
+                round(decimal_final, 2),
+                american_final,
+                round(implied_final, 2),
             )
 
-        return None
+        elif self.decimal:
+            american_final = (odds - 1) * 100
+            decimal_final = odds
+            implied_final = (1 / odds) * 100
+
+            return (
+                round(decimal_final, 2),
+                american_final,
+                round(implied_final, 2),
+            )
+
+    def calc_hedge(
+        self, original_wager: float, original_odds: t.Any, hedge_odds: t.Any
+    ) -> tuple[float, float, float, float, float, float]:
+        """
+        Calculates prevent loss wager, maximize hedge wager, and guaranteed return of hedge
+        """
+
+        if self.moneyline:
+            if hedge_odds > 0:
+                hedge_odds = (hedge_odds / 100) + 1
+                break_even = original_wager / (hedge_odds - 1)
+                break_even_payout = break_even * hedge_odds
+
+            else:
+                hedge_odds = (100 / abs(hedge_odds)) + 1
+                break_even = original_wager / (hedge_odds - 1)
+                break_even_payout = break_even * hedge_odds
+
+            if original_odds > 0:
+                original_odds = (original_odds / 100) + 1
+            else:
+                original_odds = (100 / abs(original_odds)) + 1
+
+            original_payout = original_wager * original_odds
+            equal_return = (original_wager * original_odds) / hedge_odds
+            equal_return_payout = equal_return * hedge_odds
+            equal_return_profit = equal_return_payout - (original_wager + equal_return)
+
+        else:
+            break_even = original_wager / (hedge_odds - 1)
+            break_even_payout = break_even * hedge_odds
+            original_payout = original_wager * original_odds
+            equal_return = (original_wager * original_odds) / hedge_odds
+            equal_return_payout = equal_return * hedge_odds
+            equal_return_profit = equal_return_payout - (original_wager + equal_return)
+
+        return (
+            float(original_payout),
+            float(break_even),
+            float(break_even_payout),
+            float(equal_return),
+            float(equal_return_payout),
+            float(equal_return_profit),
+        )
 
     def calc_parlay(self, wager: float, betting_lines: list) -> float:
         """
         Calculates return of given Parlay lines
         """
 
-        self.__check_wager(wager)
-
-        for line in betting_lines:
-            self.__check_line_value(line)
-
         if self.moneyline:
-            parlay_odds_value = self.__convert_moneyline(betting_lines)
-
-        elif self.fractional:
-            parlay_odds_value = self.__convert_fractional(betting_lines)
+            parlay_odds_value = self.convert_odds(betting_lines)
 
         else:
             parlay_odds_value = np.prod(betting_lines)
@@ -144,165 +193,15 @@ class Calculator:
             index=["Total", "Profit", "Wager"],
         ).T
 
-    def calc_hedge(
-        self, original_wager: float, original_odds: t.Any, hedge_odds: t.Any
-    ) -> tuple[float, float, float]:
-        """
-        Calculates prevent loss wager, maximize hedge wager, and guaranteed return of hedge
-        """
+    def calc_probability(self, line_value: t.Any) -> None:
+        """Calculates Implied Probability of given line"""
 
-        self.__check_wager(original_wager)
-        self.__check_line_value(original_odds)
-        self.__check_line_value(hedge_odds)
+        if self.decimal:
+            return (1 / line_value) * 100
 
         if self.moneyline:
-            if hedge_odds > 0:
-                hedge_odds = (hedge_odds / 100) + 1
-                prevent_loss = original_wager / hedge_odds
-            else:
-                hedge_odds = (100 / abs(hedge_odds)) + 1
-                prevent_loss = original_wager / hedge_odds
+            if line_value > 0:
+                return 100 / (line_value + 100) * 100
 
-            if original_odds > 0:
-                original_odds = (original_odds / 100) + 1
-                original_profit = (original_wager * original_odds) - original_wager
-                maximize_hedge = (original_profit + original_wager) / hedge_odds
-            else:
-                original_odds = (100 / abs(original_odds)) + 1
-                original_profit = (original_wager * original_odds) - original_wager
-                maximize_hedge = (original_profit + original_wager) / hedge_odds
-
-        elif self.fractional:
-            split_hedge = str(hedge_odds).split("/")
-            hedge_odds = (float(split_hedge[0]) / float(split_hedge[1])) + 1
-            prevent_loss = original_wager / hedge_odds
-
-            split_orig = str(original_odds).split("/")
-            original_odds = (float(split_orig[0]) / float(split_orig[1])) + 1
-            original_profit = (original_wager * original_odds) - original_wager
-            maximize_hedge = (original_profit + original_wager) / hedge_odds
-
-        else:
-            prevent_loss = original_wager / hedge_odds
-            original_profit = (original_wager * original_odds) - original_wager
-            maximize_hedge = (original_profit + original_wager) / hedge_odds
-
-        guaranteed_return = original_profit - maximize_hedge
-
-        return prevent_loss, maximize_hedge, guaranteed_return
-
-    def change_mode(
-        self, decimal: bool = False, fractional: bool = False, moneyline: bool = False
-    ) -> None:
-        """Changes metric system used for betting odds"""
-
-        if decimal + fractional + moneyline > 1:
-            raise ValueError(
-                "Too many options enabled. Choose either decimal, fractional, or moneyline inputs"
-            )
-
-        if decimal + fractional + moneyline == 0:
-            raise ValueError(
-                "No options enabled. Choose either decimal, fractional, or moneyline inputs"
-            )
-
-        self.__check_parameters(decimal, fractional, moneyline)
-
-        self.decimal = decimal
-        self.fractional = fractional
-        self.moneyline = moneyline
-
-    def __convert_moneyline(self, line_values: list) -> float:
-        """Converts moneyline values to decimal values"""
-
-        converted_lines = []
-
-        for line in line_values:
-            if line > 0:
-                converted_lines.append((line / 100) + 1)
-            else:
-                converted_lines.append((100 / abs(line)) + 1)
-
-        converted_line_value = np.prod(converted_lines)
-
-        return converted_line_value
-
-    def __convert_fractional(self, line_values: list) -> float:
-        """Converts fractional values to decimal values"""
-
-        converted_lines = []
-
-        for line in line_values:
-            split_value = str(line).split("/")
-            converted_lines.append((float(split_value[0]) / float(split_value[1])) + 1)
-
-        converted_line_value = np.prod(converted_lines)
-
-        return converted_line_value
-
-    def __check_parameters(
-        self, decimal: bool, fractional: bool, moneyline: bool
-    ) -> None:
-        """Mode parameter error checking and handling"""
-
-        if isinstance(decimal, str):
-            raise ValueError(
-                f"Decimal parameter must be True or False, not a string. Type Received: {type(decimal)}"  # pylint: disable=line-too-long
-            )
-
-        if not isinstance(decimal, bool):
-            raise ValueError(
-                f"Decimal must be True or False. Value Received: {decimal}"
-            )
-
-        if isinstance(fractional, str):
-            raise ValueError(
-                f"Fractional parameter must be True or False, not a string. Type Received: {type(fractional)}"  # pylint: disable=line-too-long
-            )
-
-        if not isinstance(fractional, bool):
-            raise ValueError(
-                f"Fractional must be True or False. Value Received: {fractional}"
-            )
-
-        if isinstance(moneyline, str):
-            raise ValueError(
-                f"Moneyline parameter must be True or False, not a string. Type Received: {type(moneyline)}"  # pylint: disable=line-too-long
-            )
-
-        if not isinstance(moneyline, bool):
-            raise ValueError(
-                f"Moneyline must be True or False. Value Received: {moneyline}"
-            )
-
-    def __check_line_value(self, line_value: t.Any) -> None:
-        """Bet line value(s) error checking and handling"""
-
-        if self.fractional:
-            if isinstance(line_value, str):
-                if not bool(re.search(r"[.0-9]*/[.0-9]*", line_value)):
-                    raise ValueError(
-                        f"Fractional does not match required input. Example Input: '9/2'. Value Received: {line_value}"  #  pylint: disable=line-too-long
-                    )
-            else:
-                raise ValueError(
-                    f"Fractional Line Values should be a string - such as '9/2'. Type Received: {type(line_value)}"  #  pylint: disable=line-too-long
-                )
-
-        elif not isinstance(line_value, (int, float)):
-            raise ValueError(
-                f"Decimal and Moneyline Line Values should be numeric and not a string. Type Received: {type(line_value)}"  #  pylint: disable=line-too-long
-            )
-
-    def __check_wager(self, wager: float) -> None:
-        """Wager value error checking and handling"""
-
-        if not isinstance(wager, (int, float)):
-            raise ValueError(
-                f"Wager Values should be numeric and not a string. Type Received: {type(wager)}"  #  pylint: disable=line-too-long
-            )
-
-        if wager < 0:
-            raise ValueError(
-                f"Wager Values cannot be a negative value. Value Received: {wager}"  #  pylint: disable=line-too-long
-            )
+            if line_value < 0:
+                return abs(line_value) / (abs(line_value) + 100) * 100

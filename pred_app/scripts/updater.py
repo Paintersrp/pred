@@ -3,6 +3,7 @@ This module contains Data Updater Classes and Methods
 """
 import sys
 import typing as t
+import json
 from datetime import date
 from collections import defaultdict
 import requests
@@ -47,13 +48,18 @@ class Updater:
 
         return data
 
-    def update_team_stats(self) -> t.Any:
+    def update_team_stats(self, per_100: bool = True) -> t.Any:
         """
         Updates and returns current season team stats, grouped by Team Name
         """
 
+        if per_100:
+            per_mode = "Per100Possessions"
+        else:
+            per_mode = "PerGame"
+
         basic_stats = ldts.LeagueDashTeamStats(
-            per_mode_detailed="Per100Possessions", season="2022-23"
+            per_mode_detailed=per_mode, season="2022-23"
         ).league_dash_team_stats.get_data_frame()
 
         basic_stats.drop(["TEAM_ID", "CFID", "CFPARAMS"], axis=1, inplace=True)
@@ -77,6 +83,11 @@ class Updater:
                 "W_PCT",
                 "GP",
                 "MIN",
+                "W_RANK",
+                "L_RANK",
+                "W_PCT_RANK",
+                "MIN_RANK",
+                "GP_RANK",
             ],
             axis=1,
             inplace=True,
@@ -88,10 +99,41 @@ class Updater:
             lambda row: "-".join(row.values.astype(str)), axis=1
         )
 
-        team_stats.to_sql("team_stats", const.ENGINE, if_exists="replace", index=False)
-        team_stats = team_stats.groupby("Team")
+        elos = DATAHANDLER.current_elos()
+        final_data = pd.concat([team_stats, elos["ELO"]], axis=1, join="outer")
 
-        return team_stats
+        final_data = final_data[
+            final_data.columns.drop(list(final_data.filter(regex="_RANK")))
+        ]
+
+        final_data = final_data[
+            final_data.columns.drop(list(final_data.filter(regex="E_")))
+        ]
+
+        final_data.columns = final_data.columns.str.replace("_PCT", "%")
+        final_data.columns = final_data.columns.str.replace("_RATING", "")
+
+        if not per_100:
+            final_data.to_sql(
+                f"per_game_team_stats", const.ENGINE, if_exists="replace", index=False
+            )
+
+            final_data.to_json(
+                f"C:/Python/pred_app/pred_react_v2/public/data/per_game_team_stats.json",
+                orient="records",
+            )
+        else:
+            final_data.to_sql(
+                "team_stats", const.ENGINE, if_exists="replace", index=False
+            )
+            final_data.to_json(
+                f"C:/Python/pred_app/pred_react_v2/public/data/per_100_team_stats.json",
+                orient="records",
+            )
+
+        grouped = team_stats.groupby("Team")
+
+        return team_stats, grouped
 
     def update_schedule(self) -> None:
         """
@@ -106,6 +148,11 @@ class Updater:
 
         upcoming.to_sql(
             "2023_upcoming_games", const.ENGINE, if_exists="replace", index=False
+        )
+
+        upcoming.to_json(
+            f"C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
+            orient="records",
         )
 
     def update_massey(self) -> pd.DataFrame:
@@ -200,17 +247,30 @@ class Updater:
 
         if features == const.NET_FULL_FEATURES:
             old_pred_history = DATAHANDLER.prediction_history()
+            old_pred_history = old_pred_history.rename(
+                columns={"Away": "A_Team", "Home": "H_Team"}
+            )
+            old_pred_history["Date"] = pd.to_datetime(old_pred_history["Date"]).dt.date
 
-            new_pred_history = pd.concat(
-                [pred_history_update, old_pred_history], axis=0, join="outer"
+            new_pred_history = (
+                pd.concat([pred_history_update, old_pred_history], axis=0, join="outer")
+                .sort_values("Date", ascending=False)
+                .reset_index(drop=True)
             )
 
             new_pred_history.drop_duplicates(
                 subset=["Date", "A_Team"], keep="first", inplace=True
             )
 
+            new_pred_history["A_Odds"] = round(
+                new_pred_history["A_Odds"].astype(float), 3
+            )
+            new_pred_history["H_Odds"] = round(
+                new_pred_history["H_Odds"].astype(float), 3
+            )
+
             new_pred_history.to_sql(
-                "prediction_history_net", const.ENGINE, if_exists="replace", index=False
+                "prediction_history_v2", const.ENGINE, if_exists="replace", index=False
             )
 
         elif features == const.MASSEY_FULL_FEATURES:
@@ -326,36 +386,42 @@ class Updater:
 
                 if player_name is not None:
                     if status_check is None:
-                        injury_dict[team_names[i].text].append(
-                            (player_name.text + "-" + position.text)
-                        )
-                    else:
-                        injury_dict[team_names[i].text].append(
-                            (player_name.text + "-" + status.text.replace("GTD", "TBD"))
-                        )
+                        # injury_dict[team_names[i].text].append(
+                        #     (player_name.text + "-" + position.text)
+                        # )
+                        injury_dict[team_names[i].text].append((player_name.text))
+                    # else:
+                    #     injury_dict[team_names[i].text].append(
+                    #         (player_name.text + "-" + status.text.replace("GTD", "TBD"))
+                    #     )
 
         return injury_dict
 
-    def update_full_stats(self) -> None:
+    def update_full_stats_per_100(self) -> None:
         """
         Combines daily team stat and massey rating updates for display
         """
 
         massey = DATAHANDLER.current_massey()
+        elos = DATAHANDLER.current_elos()
         team = DATAHANDLER.raw_team_stats()
 
         massey.sort_values("Name", ascending=True, inplace=True)
         massey.reset_index(drop=True, inplace=True)
 
-        combined = pd.concat([team, massey["Massey"]], axis=1, join="outer")
+        combined = pd.concat(
+            [team, massey["Massey"], elos["ELO"]], axis=1, join="outer"
+        )
         combined = combined[combined.columns.drop(list(combined.filter(regex="_RANK")))]
 
         combined = combined[
             [
                 "Team",
-                "Record",
+                "W",
+                "L",
                 "Conf",
                 "Massey",
+                "ELO",
                 "PTS",
                 "AST",
                 "STL",
@@ -363,30 +429,19 @@ class Updater:
                 "TOV",
                 "OREB",
                 "DREB",
-                "OFF_RATING",
-                "DEF_RATING",
-                "NET_RATING",
+                "OFF",
+                "DEF",
+                "NET",
                 "PIE",
-                "FG_PCT",
-                "FG3_PCT",
-                "TS_PCT",
+                "FG%",
+                "FG3%",
+                "TS%",
             ]
         ]
 
-        combined = combined.rename(
-            columns={
-                "TS_PCT": "TS%",
-                "OFF_RATING": "OFF",
-                "DEF_RATING": "DEF",
-                "NET_RATING": "NET",
-                "OREB": "ORB",
-                "DREB": "DRB",
-                "FG_PCT": "FG%",
-                "FG3_PCT": "FG3%",
-            }
-        )
-
         combined["Massey"] = round(combined["Massey"], 2)
+        combined["ELO"] = round(combined["ELO"], 2)
+
         combined.to_sql("all_stats", const.ENGINE, if_exists="replace", index=False)
 
     def update_history_outcomes(self) -> None:
@@ -400,8 +455,20 @@ class Updater:
 
         new_history = []
 
-        predicted = DATAHANDLER.prediction_history()
-        predicted["Actual"] = "TBD"
+        # predicted = DATAHANDLER.prediction_history()
+        predicted = pd.read_sql_table("prediction_history_v2", const.ENGINE)
+
+        predicted["A_Team"] = np.where(
+            predicted["A_Team"] == "Los Angeles Clippers",
+            "LA Clippers",
+            predicted["A_Team"],
+        )
+
+        predicted["H_Team"] = np.where(
+            predicted["H_Team"] == "Los Angeles Clippers",
+            "LA Clippers",
+            predicted["H_Team"],
+        )
 
         played = DATAHANDLER.schedule_by_year(2023)
 
@@ -413,7 +480,10 @@ class Updater:
             played["Home"] == "Los Angeles Clippers", "LA Clippers", played["Home"]
         )
 
-        pred_mask = predicted["Date"] != str(date.today())
+        predicted["Date"] = pd.to_datetime(predicted["Date"]).dt.date
+        played["Date"] = pd.to_datetime(played["Date"]).dt.date
+
+        pred_mask = predicted["Date"] != date.today()
         predicted = predicted.loc[pred_mask].reset_index(drop=True)
 
         for game_date in predicted["Date"].unique():
@@ -428,31 +498,55 @@ class Updater:
                 mov_dict[filtered_played.at[i, "Away"]] = filtered_played.at[i, "MOV"]
 
             for i in filtered_predicted.index:
-                filtered_predicted.at[i, "Actual"] = mov_dict[
+                filtered_predicted.at[i, "MOV"] = mov_dict[
                     filtered_predicted.at[i, "A_Team"]
                 ]
 
                 if float(filtered_predicted.at[i, "A_Odds"]) > 0.5:
-                    if filtered_predicted.at[i, "Actual"] > 0:
-                        filtered_predicted.at[i, "Outcome"] = 0
-                    else:
-                        filtered_predicted.at[i, "Outcome"] = 1
+                    filtered_predicted.at[i, "Pred"] = 0
                 else:
-                    if filtered_predicted.at[i, "Actual"] > 0:
-                        filtered_predicted.at[i, "Outcome"] = 1
-                    else:
-                        filtered_predicted.at[i, "Outcome"] = 0
+                    filtered_predicted.at[i, "Pred"] = 1
+
+                if filtered_predicted.at[i, "MOV"] < 0:
+                    filtered_predicted.at[i, "Outcome"] = 0
+                else:
+                    filtered_predicted.at[i, "Outcome"] = 1
 
             new_history.append(filtered_predicted)
 
         new_history = pd.concat(new_history, axis=0, join="outer")
         previous_history = DATAHANDLER.pred_scoring()
+        previous_history["Date"] = pd.to_datetime(previous_history["Date"]).dt.date
 
         combined = pd.concat([previous_history, new_history], axis=0, join="outer")
-        combined.drop_duplicates(subset=["Date", "A_Team"], keep="first", inplace=True)
-        combined = combined.sort_values("Date", ascending=False).reset_index(drop=True)
+        combined.drop_duplicates(
+            subset=["Date", "A_Team", "H_Team"], keep="first", inplace=True
+        )
+        combined = new_history.sort_values("Date", ascending=False).reset_index(
+            drop=True
+        )
+
         combined.to_sql(
-            "prediction_scoring", const.ENGINE, if_exists="replace", index=False
+            "prediction_scoring_v2", const.ENGINE, if_exists="replace", index=False
+        )
+
+        combined["Date"] = combined["Date"].astype(str)
+
+        combined.to_json(
+            "C:/Python/pred_app/pred_react_v2/public/data/pred_history.json",
+            orient="records",
+        )
+
+        correct = sum(combined.Outcome == combined.Pred)
+        incorrect = sum(combined.Outcome != combined.Pred)
+        ratio = round(correct / (correct + incorrect) * 100, 2)
+
+        test = pd.DataFrame([0, correct, incorrect, ratio]).T
+        test.columns = ["index", "correct", "incorrect", "ratio"]
+
+        test.to_json(
+            "C:/Python/pred_app/pred_react_v2/public/data/scoring.json",
+            orient="records",
         )
 
     def update_upcoming(self) -> None:
@@ -536,7 +630,7 @@ class Updater:
             "current_odds_history", const.ENGINE, if_exists="replace", index=False
         )
 
-    def update_todays_lines(data: pd.DataFrame) -> None:
+    def update_todays_lines(data: pd.DataFrame) -> pd.DataFrame:
         """
         Updates todays lines and commits to database
         """
@@ -563,6 +657,8 @@ class Updater:
                     todays_preds.at[i, "H_ML"] = data.at[j, "H_ML"]
 
         data.to_sql("todays_lines", const.ENGINE, if_exists="replace", index=False)
+
+        return data
 
     def update_training_schedule(self):
         DATAHANDLER = GeneralHandler()
@@ -592,13 +688,11 @@ class Updater:
                 [schedule, games_to_update], axis=0, join="outer"
             ).reset_index(drop=True)
 
-            print(new_schedule)
-
             new_schedule.to_sql(
                 "training_schedule", const.ENGINE, if_exists="replace", index=False
             )
 
-    def update_training_data() -> None:
+    def update_training_data(self) -> None:
         """
         Loads previous training data and most recent list of played games
 
@@ -610,9 +704,10 @@ class Updater:
         DATAHANDLER = GeneralHandler()
         SCRAPER = Scraper()
 
-        training = DATAHANDLER.training_data_v2()
+        trainingv2 = DATAHANDLER.training_data_v2()
+        training = pd.read_sql_table("training_base", const.ENGINE)
         played = DATAHANDLER.schedule_by_year(2023)
-
+        prev_full_sch = pd.read_sql_table("full_sch", const.ENGINE)
         training["Date"] = pd.to_datetime(training["Date"]).dt.date
         played["Date"] = pd.to_datetime(played["Date"]).dt.date
 
@@ -630,18 +725,49 @@ class Updater:
         else:
             mask = played["Date"] >= update_check[0]
             games_to_update = played.loc[mask].reset_index(drop=True)
-
             new_data = SCRAPER.get_training_data_from_sch(games_to_update)
-            new_data = clean_train(new_data, games_to_update)
-            new_training = pd.concat(
+
+            new_full_sch = pd.concat(
+                [prev_full_sch, games_to_update], axis=0, join="outer"
+            ).reset_index(drop=True)
+
+            new_full_data = pd.concat(
                 [training, new_data], axis=0, join="outer"
             ).reset_index(drop=True)
 
-            print(new_training)
+            new_full_data.drop(["A_TEAM_NAME", "H_TEAM_NAME"], axis=1, inplace=True)
 
-            new_training.to_sql(
-                "training_data_v3", const.ENGINE, if_exists="replace", index=False
+            new_final = clean_train(new_full_data, new_full_sch)
+
+            new_full_sch.to_sql(
+                "full_sch", const.ENGINE, if_exists="replace", index=False
             )
+
+            new_full_data.to_sql(
+                "training_base", const.ENGINE, if_exists="replace", index=False
+            )
+
+            new_final.to_sql(
+                "training_data_v2", const.ENGINE, if_exists="replace", index=False
+            )
+
+    def update_elos(self, elos: dict) -> None:
+        """Func"""
+
+        elos = (
+            pd.DataFrame.from_dict(elos, orient="index")
+            .reset_index()
+            .sort_values("index")
+            .reset_index(drop=True)
+        )
+
+        elos.columns = ["Team", "ELO"]
+
+        elos.to_json(
+            "C:/Python/pred_app/pred_react_v2/public/data/elos.json", orient="records"
+        )
+
+        elos.to_sql("current_elos", const.ENGINE, if_exists="replace", index=False)
 
     #           NEEDS UPDATE TO ELO ADDITION VERSION
     # def update_sim_pred(self):

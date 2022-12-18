@@ -241,12 +241,18 @@ class GeneralHandler(Handler):
     def prediction_history(self) -> pd.DataFrame:
         """Returns prediction history of Net focused model"""
 
-        return pd.read_sql_table("prediction_history_net", const.ENGINE)
+        return pd.read_sql_table("prediction_history_v2", const.ENGINE)
 
     def prediction_history_massey(self) -> pd.DataFrame:
         """Returns prediction history of Massey focused model"""
 
         return pd.read_sql_table("prediction_history_massey", const.ENGINE)
+
+    def daily_lineups(self) -> pd.DataFrame:
+        return pd.read_sql_table("daily_lineups", const.ENGINE)
+
+    def daily_card_data(self) -> pd.DataFrame:
+        return pd.read_sql_table("daily_card_data", const.ENGINE)
 
     def schedule_by_year(self, year: int) -> pd.DataFrame:
         """Returns schedule of completed games for given year"""
@@ -262,6 +268,11 @@ class GeneralHandler(Handler):
         """Returns full boxscore dataset"""
 
         return pd.read_sql_table("boxscore_data", const.ENGINE)
+
+    def current_elos(self) -> pd.DataFrame:
+        """Returns current elos dataset"""
+
+        return pd.read_sql_table("current_elos", const.ENGINE)
 
     def raw_team_stats(self) -> pd.DataFrame:
         """Returns current team stats without additions"""
@@ -297,6 +308,11 @@ class GeneralHandler(Handler):
         """Returns most up-to-date daily lines"""
 
         return pd.read_sql_table("todays_lines", const.ENGINE)
+
+    def today_preds(self) -> pd.DataFrame:
+        """Returns today's predictions table"""
+
+        return pd.read_sql_table("today_preds", const.ENGINE)
 
 
 class TeamsHandler(Handler):
