@@ -71,14 +71,14 @@ class Calculator:
 
     def __init__(
         self,
-        typeCheck: int = 1,
+        type_check: int = 1,
     ) -> None:
         self.decimal = False
         self.moneyline = False
 
-        if typeCheck == 1:
+        if type_check == 1:
             self.moneyline = True
-        elif typeCheck == 2:
+        elif type_check == 2:
             self.decimal = True
 
     def payout(self, wager: float, odds: int) -> float:
@@ -117,7 +117,7 @@ class Calculator:
                 round(implied_final, 2),
             )
 
-        elif self.decimal:
+        if self.decimal:
             american_final = (odds - 1) * 100
             decimal_final = odds
             implied_final = (1 / odds) * 100
@@ -127,6 +127,8 @@ class Calculator:
                 american_final,
                 round(implied_final, 2),
             )
+
+        return None
 
     def calc_hedge(
         self, original_wager: float, original_odds: t.Any, hedge_odds: t.Any
@@ -205,3 +207,5 @@ class Calculator:
 
             if line_value < 0:
                 return abs(line_value) / (abs(line_value) + 100) * 100
+
+        return 0

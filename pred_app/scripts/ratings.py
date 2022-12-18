@@ -3,12 +3,14 @@ This scripts contains functions for adding ELO/Massey Ratings to new and histori
 """
 from datetime import date
 import typing as t
+import math
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from scripts import scraper, handler
+from scripts.handler import GeneralHandler
 from scripts import const
-import math
+
+DATAHANDLER = GeneralHandler()
 
 
 def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
@@ -25,15 +27,15 @@ def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
     data["H-Pts"] = data["H-Pts"].astype(float)
     data["A-Pts"] = data["A-Pts"].astype(float)
 
-    for id in tqdm(data["SeasonID"].unique()):
-        filtered_data = data.loc[data["SeasonID"] == id].reset_index(drop=True)
+    for season_id in tqdm(data["SeasonID"].unique()):
+        filtered_data = data.loc[data["SeasonID"] == season_id].reset_index(drop=True)
         filtered_data.drop(filtered_data.columns[[1, 6, 7, 8]], axis=1, inplace=True)
 
         if season > 0:
-            current_elos = update_elo_new_season(current_elos)
+            cur_elos = update_elo_new_season(cur_elos)
 
         else:
-            current_elos = (
+            cur_elos = (
                 np.ones(shape=(len(filtered_data["Away"].unique()))) * const.MEAN_ELO
             )
 
@@ -64,22 +66,22 @@ def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
 
             if final.at[idx, "Outcome"] == 0:
                 a_end_elo, h_end_elo, a_start_elo, h_start_elo = adjust_elo(
-                    current_elos[final.at[idx, "Away"]],
-                    current_elos[final.at[idx, "Home"]],
+                    cur_elos[final.at[idx, "Away"]],
+                    cur_elos[final.at[idx, "Home"]],
                     final.at[idx, "MOV"],
                     0,
                 )
-                current_elos[final.at[idx, "Away"]] = a_end_elo
-                current_elos[final.at[idx, "Home"]] = h_end_elo
+                cur_elos[final.at[idx, "Away"]] = a_end_elo
+                cur_elos[final.at[idx, "Home"]] = h_end_elo
             else:
                 h_end_elo, a_end_elo, h_start_elo, a_start_elo = adjust_elo(
-                    current_elos[final.at[idx, "Home"]],
-                    current_elos[final.at[idx, "Away"]],
+                    cur_elos[final.at[idx, "Home"]],
+                    cur_elos[final.at[idx, "Away"]],
                     final.at[idx, "MOV"],
                     1,
                 )
-                current_elos[final.at[idx, "Home"]] = h_end_elo
-                current_elos[final.at[idx, "Away"]] = a_end_elo
+                cur_elos[final.at[idx, "Home"]] = h_end_elo
+                cur_elos[final.at[idx, "Away"]] = a_end_elo
 
             arr.extend([round(a_start_elo, 2), round(h_start_elo, 2)])
             full_arrays.append(arr)
@@ -92,7 +94,8 @@ def add_elo(concat_to: pd.DataFrame, data: pd.DataFrame = None) -> pd.DataFrame:
 
 
 def current_elos() -> dict:
-    DATAHANDLER = handler.GeneralHandler()
+    """Func"""
+
     schedule = DATAHANDLER.training_schedule()
 
     schedule["H-Pts"] = schedule["H-Pts"].astype(float)
@@ -162,22 +165,22 @@ def current_elos() -> dict:
 
     for row in schedule.itertuples():
         if row.H_Pts > row.A_Pts:
-            w = row.Home
-            l = row.Away
+            winner = row.Home
+            loser = row.Away
             home_win = 1
         else:
-            w = row.Away
-            l = row.Home
+            winner = row.Away
+            loser = row.Home
             home_win = 0
 
         margin = abs(row.MOV)
 
-        new_w_elo, new_l_elo, old_w_elo, old_l_elo = adjust_elo(
-            elo_dict[w], elo_dict[l], margin, home_win
+        new_w_elo, new_l_elo, _old_w_elo, _old_l_elo = adjust_elo(
+            elo_dict[winner], elo_dict[loser], margin, home_win
         )
 
-        elo_dict[w] = new_w_elo
-        elo_dict[l] = new_l_elo
+        elo_dict[winner] = new_w_elo
+        elo_dict[loser] = new_l_elo
 
     return elo_dict
 
@@ -212,6 +215,8 @@ def expected_outcome(elo_diff: float) -> float:
 
 
 def expected_margin(elo_diff):
+    """Func"""
+
     return 7.5 + 0.006 * elo_diff
 
 
@@ -289,6 +294,7 @@ def current_massey(data: pd.DataFrame, season_code: str) -> pd.DataFrame:
     """
     Gets Massey Ratings for the current season up to the most recently played game
     """
+
     check_date = date.today()
     full_arrays = []
     j = 0

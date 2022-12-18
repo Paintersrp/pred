@@ -2,7 +2,6 @@
 This module contains Data Handler Classes and Methods
 """
 import typing as t
-from datetime import datetime
 from PIL import Image
 import pandas as pd
 import numpy as np
@@ -18,53 +17,6 @@ class Handler:
 
     def __init__(self):
         self.data = None
-        self.loaded = None
-        self.slot_one = None
-        self.slot_two = None
-        self.slot_three = None
-
-    def load_data(self, data: t.Any) -> None:
-        """Loads data for extra processing"""
-
-        self.data = data
-        self.loaded = data.copy()
-
-    def stow_data(self, slot: int = 1) -> None:
-        """
-        Saves a copy of the current data for later use
-
-        Slots available: 3
-        """
-
-        self.__slot_check(slot)
-
-        if slot == 1:
-            self.slot_one = self.data.copy()
-        elif slot == 2:
-            self.slot_two = self.data.copy()
-        else:
-            self.slot_three = self.data.copy()
-
-    def unstow_data(self, slot: int = 1) -> None:
-        """
-        Loads a copy of the stowed data at given slot
-
-        Slots available: 3
-        """
-
-        self.__slot_check(slot)
-
-        if slot == 1:
-            self.data = self.slot_one.copy()
-            self.loaded = self.slot_one.copy()
-
-        elif slot == 2:
-            self.data = self.slot_two.copy()
-            self.loaded = self.slot_two.copy()
-
-        else:
-            self.data = self.slot_three.copy()
-            self.loaded = self.slot_three.copy()
 
     def print_data(self) -> None:
         """Prints currently loaded data"""
@@ -75,119 +27,6 @@ class Handler:
         """Returns currently loaded data"""
 
         return self.data
-
-    def reset_data(self) -> None:
-        """Resets data to unfiltered state"""
-
-        self.data = self.loaded.copy()
-
-    def drop_columns(self, columns_to_drop: t.Any) -> None:
-        """Drops a str, list, tuple, or enumerate of columns"""
-
-        self.data.drop(columns_to_drop, axis=1, inplace=True)
-
-    def sort_columns(self, column: t.Any, ascending: bool) -> None:
-        """Sorts given column"""
-
-        self.data = self.data.sort_values(column, ascending=ascending).reset_index(
-            drop=True
-        )
-
-    def filter_columns(self, column: list, value: t.Any, mode: int) -> None:
-        """
-        Filters a column by a value
-
-        Mode 1 (Equals)
-
-        Mode 2 (Greater Than)
-
-        Mode 3 (Less Than)
-        """
-
-        self.__mode_check(mode)
-
-        if mode == 1:
-            mask = self.data[column] == value
-            self.data = self.data.loc[mask].reset_index(drop=True)
-        elif mode == 2:
-            mask = self.data[column] > value
-            self.data = self.data.loc[mask].reset_index(drop=True)
-        elif mode == 3:
-            mask = self.data[column] < value
-            self.data = self.data.loc[mask].reset_index(drop=True)
-
-    def filter_date_range(
-        self, column: list, start_date: t.Any, end_date: t.Any
-    ) -> None:
-        """Filters date column by start and end date range"""
-
-        start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        self.data[column] = pd.to_datetime(self.data[column])
-
-        mask = (self.data[column] >= start_date) & (self.data[column] <= end_date)
-        self.data = self.data.loc[mask].reset_index(drop=True)
-
-    def filter_season(
-        self,
-        season_id: str,
-    ) -> None:
-        """Filters date column by start and end date range"""
-
-        mask = self.data["SeasonID"] == season_id
-        self.data = self.data.loc[mask].reset_index(drop=True)
-
-    def print_columns(self) -> None:
-        """Prints a list of columns in current data"""
-
-        print(*self.data.columns)
-
-    def rename_columns(self, new_columns_dict: dict) -> None:
-        """Renames columns in current data based on given dict"""
-
-        self.data = self.data.rename(columns=new_columns_dict)
-
-    def regex_drop_columns(self, regex_str: str) -> None:
-        """Filters columns by regex input"""
-
-        self.data = self.data[
-            self.data.columns.drop(list(self.data.filter(regex=f"{regex_str}")))
-        ]
-
-    def preset_filter(self, training: bool, boxscore: bool = False) -> None:
-        """Func"""
-
-        if training:
-            self.data = self.data[["Home", "Away"] + const.NET_FULL_FEATURES]
-            self.data.columns = self.data.columns.str.replace("_PCT", "%")
-            self.data.columns = self.data.columns.str.replace("_RATIO", "_R")
-        elif boxscore:
-            self.data = self.data[["Home", "Away"] + const.BOX_DISPLAY_FEATURES]
-            self.data[const.BOX_DISPLAY_FEATURES] = self.data[
-                const.BOX_DISPLAY_FEATURES
-            ].astype(float)
-
-    def groupby_averages(self, column: list) -> None:
-        """Func"""
-
-        self.data = self.data.groupby(column).agg(np.mean)
-
-    def to_csv(self, file_name: str) -> None:
-        """Exports current data to .csv file"""
-
-        self.data.to_csv(f"{file_name}.csv", index=None)
-
-    def __slot_check(self, slot: int) -> None:
-        """Raises errors given bad input for parameter: slot"""
-
-        if slot > 3 or slot < 0:
-            raise ValueError(f"Choose from slot 1, 2, or 3. Slot received: {slot}")
-
-    def __mode_check(self, mode: int) -> None:
-        """Raises errors given bad input for parameter: slot"""
-
-        if mode > 3 or mode < 0:
-            raise ValueError(f"Choose from mode 1, 2, or 3. Mode received: {mode}")
 
 
 class GeneralHandler(Handler):
@@ -249,9 +88,11 @@ class GeneralHandler(Handler):
         return pd.read_sql_table("prediction_history_massey", const.ENGINE)
 
     def daily_lineups(self) -> pd.DataFrame:
+        """Returns daily lineup data"""
         return pd.read_sql_table("daily_lineups", const.ENGINE)
 
     def daily_card_data(self) -> pd.DataFrame:
+        """Returns Game Card data"""
         return pd.read_sql_table("daily_card_data", const.ENGINE)
 
     def schedule_by_year(self, year: int) -> pd.DataFrame:

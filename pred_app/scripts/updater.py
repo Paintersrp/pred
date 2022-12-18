@@ -3,19 +3,17 @@ This module contains Data Updater Classes and Methods
 """
 import sys
 import typing as t
-import json
 from datetime import date
 from collections import defaultdict
 import requests
 import pandas as pd
 import numpy as np
-import xgboost as xgb
 from bs4 import BeautifulSoup
 from nba_api.stats.endpoints import leaguedashteamstats as ldts
 from scripts import const, dicts
 from scripts.ratings import current_massey
 from scripts.scraper import Scraper
-from scripts.handler import GeneralHandler, MetricsHandler
+from scripts.handler import GeneralHandler
 from scripts.initialize import clean_odds_data, clean_train
 
 DATAHANDLER = GeneralHandler()
@@ -115,11 +113,11 @@ class Updater:
 
         if not per_100:
             final_data.to_sql(
-                f"per_game_team_stats", const.ENGINE, if_exists="replace", index=False
+                "per_game_team_stats", const.ENGINE, if_exists="replace", index=False
             )
 
             final_data.to_json(
-                f"C:/Python/pred_app/pred_react_v2/public/data/per_game_team_stats.json",
+                "C:/Python/pred_app/pred_react_v2/public/data/per_game_team_stats.json",
                 orient="records",
             )
         else:
@@ -127,7 +125,7 @@ class Updater:
                 "team_stats", const.ENGINE, if_exists="replace", index=False
             )
             final_data.to_json(
-                f"C:/Python/pred_app/pred_react_v2/public/data/per_100_team_stats.json",
+                "C:/Python/pred_app/pred_react_v2/public/data/per_100_team_stats.json",
                 orient="records",
             )
 
@@ -151,7 +149,7 @@ class Updater:
         )
 
         upcoming.to_json(
-            f"C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
+            "C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
             orient="records",
         )
 
@@ -380,20 +378,11 @@ class Updater:
         for i, lineup_list in enumerate(unordered_lists):
             for detail in lineup_list.find_all("li"):
                 player_name = detail.find("a")
-                status = detail.find("span")
                 status_check = detail.find(name="div", attrs={"style": "width:15px;"})
-                position = detail.find(name="div")
 
                 if player_name is not None:
                     if status_check is None:
-                        # injury_dict[team_names[i].text].append(
-                        #     (player_name.text + "-" + position.text)
-                        # )
                         injury_dict[team_names[i].text].append((player_name.text))
-                    # else:
-                    #     injury_dict[team_names[i].text].append(
-                    #         (player_name.text + "-" + status.text.replace("GTD", "TBD"))
-                    #     )
 
         return injury_dict
 
@@ -454,9 +443,7 @@ class Updater:
         """
 
         new_history = []
-
-        # predicted = DATAHANDLER.prediction_history()
-        predicted = pd.read_sql_table("prediction_history_v2", const.ENGINE)
+        predicted = DATAHANDLER.prediction_history()
 
         predicted["A_Team"] = np.where(
             predicted["A_Team"] == "Los Angeles Clippers",
@@ -518,33 +505,33 @@ class Updater:
         previous_history = DATAHANDLER.pred_scoring()
         previous_history["Date"] = pd.to_datetime(previous_history["Date"]).dt.date
 
-        combined = pd.concat([previous_history, new_history], axis=0, join="outer")
-        combined.drop_duplicates(
+        new_history = pd.concat([previous_history, new_history], axis=0, join="outer")
+        new_history.drop_duplicates(
             subset=["Date", "A_Team", "H_Team"], keep="first", inplace=True
         )
-        combined = new_history.sort_values("Date", ascending=False).reset_index(
+        new_history = new_history.sort_values("Date", ascending=False).reset_index(
             drop=True
         )
 
-        combined.to_sql(
+        new_history.to_sql(
             "prediction_scoring_v2", const.ENGINE, if_exists="replace", index=False
         )
 
-        combined["Date"] = combined["Date"].astype(str)
+        new_history["Date"] = new_history["Date"].astype(str)
 
-        combined.to_json(
+        new_history.to_json(
             "C:/Python/pred_app/pred_react_v2/public/data/pred_history.json",
             orient="records",
         )
 
-        correct = sum(combined.Outcome == combined.Pred)
-        incorrect = sum(combined.Outcome != combined.Pred)
+        correct = sum(new_history.Outcome == new_history.Pred)
+        incorrect = sum(new_history.Outcome != new_history.Pred)
         ratio = round(correct / (correct + incorrect) * 100, 2)
 
-        test = pd.DataFrame([0, correct, incorrect, ratio]).T
-        test.columns = ["index", "correct", "incorrect", "ratio"]
+        scoring = pd.DataFrame([0, correct, incorrect, ratio]).T
+        scoring.columns = ["index", "correct", "incorrect", "ratio"]
 
-        test.to_json(
+        scoring.to_json(
             "C:/Python/pred_app/pred_react_v2/public/data/scoring.json",
             orient="records",
         )
@@ -630,38 +617,38 @@ class Updater:
             "current_odds_history", const.ENGINE, if_exists="replace", index=False
         )
 
-    def update_todays_lines(data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Updates todays lines and commits to database
-        """
+    # def update_todays_lines(self, data: pd.DataFrame) -> pd.DataFrame:
+    #     """
+    #     Updates todays lines and commits to database
+    #     """
 
-        # add todays preds to general handler?
-        dh = MetricsHandler()
-        todays_preds = dh.today_preds()
-        data = SCRAPER.get_todays_lines()
-        data = SCRAPER.clean_todays_lines(data)
+    #     # add todays preds to general handler?
+    #     dh = MetricsHandler()
+    #     todays_preds = dh.today_preds()
+    #     data = SCRAPER.get_todays_lines()
+    #     data = SCRAPER.clean_todays_lines(data)
 
-        for i in todays_preds.index:
-            for j in data.index:
-                if (
-                    data.at[j, "Home"] == todays_preds.at[i, "H_Team"]
-                    and data.at[j, "Away"] == todays_preds.at[i, "A_Team"]
-                ):
-                    todays_preds.at[i, "O/U"] = data.at[j, "A_OU"]
-                    todays_preds.at[i, "A_OU_Line"] = data.at[j, "A_OU_Line"]
-                    todays_preds.at[i, "H_OU_Line"] = data.at[j, "H_OU_Line"]
-                    todays_preds.at[i, "Spread"] = data.at[j, "A_Spread"]
-                    todays_preds.at[i, "A_Spr_Line"] = data.at[j, "A_Spread_Line"]
-                    todays_preds.at[i, "H_Spr_Line"] = data.at[j, "H_Spread_Line"]
-                    todays_preds.at[i, "A_ML"] = data.at[j, "A_ML"]
-                    todays_preds.at[i, "H_ML"] = data.at[j, "H_ML"]
+    #     for i in todays_preds.index:
+    #         for j in data.index:
+    #             if (
+    #                 data.at[j, "Home"] == todays_preds.at[i, "H_Team"]
+    #                 and data.at[j, "Away"] == todays_preds.at[i, "A_Team"]
+    #             ):
+    #                 todays_preds.at[i, "O/U"] = data.at[j, "A_OU"]
+    #                 todays_preds.at[i, "A_OU_Line"] = data.at[j, "A_OU_Line"]
+    #                 todays_preds.at[i, "H_OU_Line"] = data.at[j, "H_OU_Line"]
+    #                 todays_preds.at[i, "Spread"] = data.at[j, "A_Spread"]
+    #                 todays_preds.at[i, "A_Spr_Line"] = data.at[j, "A_Spread_Line"]
+    #                 todays_preds.at[i, "H_Spr_Line"] = data.at[j, "H_Spread_Line"]
+    #                 todays_preds.at[i, "A_ML"] = data.at[j, "A_ML"]
+    #                 todays_preds.at[i, "H_ML"] = data.at[j, "H_ML"]
 
-        data.to_sql("todays_lines", const.ENGINE, if_exists="replace", index=False)
+    #     data.to_sql("todays_lines", const.ENGINE, if_exists="replace", index=False)
 
-        return data
+    #     return data
 
     def update_training_schedule(self):
-        DATAHANDLER = GeneralHandler()
+        """Func"""
 
         schedule = DATAHANDLER.training_schedule()
         played = DATAHANDLER.schedule_by_year(2023)
@@ -701,10 +688,6 @@ class Updater:
         Scrapes missing game data, committing to training data
         """
 
-        DATAHANDLER = GeneralHandler()
-        SCRAPER = Scraper()
-
-        trainingv2 = DATAHANDLER.training_data_v2()
         training = pd.read_sql_table("training_base", const.ENGINE)
         played = DATAHANDLER.schedule_by_year(2023)
         prev_full_sch = pd.read_sql_table("full_sch", const.ENGINE)

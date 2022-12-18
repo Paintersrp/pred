@@ -424,7 +424,7 @@ class DailyPredictor(Predictor):
 
         full_arrays = []
         ratings_array = []
-        data = pd.read_sql_table(f"2023_upcoming_games", const.ENGINE)
+        data = pd.read_sql_table("2023_upcoming_games", const.ENGINE)
         data["Date"] = pd.to_datetime(data["Date"]).dt.date
 
         data["Away"] = np.where(
