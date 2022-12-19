@@ -34,8 +34,8 @@ def register_view(request):
 def login_view(request):
     if request.method == "POST":
         print(request.data["email"])
-        email = request.data["formValues"]["email"]
-        password = request.data["formValues"]["password"]
+        email = request.data["email"]
+        password = request.data["password"]
 
         user = Users.objects.filter(email=email).first()
 
