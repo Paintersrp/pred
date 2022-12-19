@@ -162,32 +162,8 @@
   }
 }
 
-@media screen and (max-width: 825px) {
-  .btn-table {
-    width: 25%;
-  }
-}
-
-@media screen and (max-width: 670px) {
-  .btn-table {
-    width: 30%;
-  }
-}
-
-@media screen and (max-width: 555px) {
-  .btn-table {
-    width: 37.5%;
-  }
-}
-
-@media screen and (max-width: 475px) {
-  .btn-table {
-    width: 42.5%;
-  }
-}
-
-@media screen and (max-width: 395px) {
-  .btn-table {
-    width: 45%;
+@media screen and (max-width: 960px) and (orientation: landscape) and (min-height: 391px) {
+  .layout-table {
+    height: 128vh;
   }
 }

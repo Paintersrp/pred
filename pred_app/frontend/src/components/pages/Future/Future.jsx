@@ -60,7 +60,7 @@ const Future = () => {
           paginationPageSize={25}
           onCellClicked={cellClickedListener}
         />
-        <p className="set-semibold disclaim text-[12px] mb-1">
+        <p className="set-semibold disclaim text-[12px] mb-1 mt-2">
           *Predictions will change daily, adjusting for new data.
         </p>
       </div>

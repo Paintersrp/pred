@@ -52,108 +52,122 @@ function Navbar(props) {
           <div className="menu-icon" onClick={handleClick}>
             {click ? <FaTimes /> : <FaBars />}
           </div>
-          <ul className={click ? "nav-menu active" : "nav-menu"}>
-            <li className="nav-item">
-              <Link to="/predictions" className="nav-links" onClick={hideMenu}>
-                Predictions
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/future" className="nav-links" onClick={hideMenu}>
-                Future
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/history" className="nav-links" onClick={hideMenu}>
-                History
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/WIP" className="nav-links" onClick={hideMenu}>
-                Compare
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/calc/payout" className="nav-links" onClick={hideMenu}>
-                Calculators
-              </Link>
-            </li>
-            <li className="nav-item">
-              <Link to="/WIP" className="nav-links" onClick={hideMenu}>
-                FAQ
-              </Link>
-            </li>
-            {props.user === "" ? (
-              <li className="nav-btn">
-                {button ? (
-                  <Link to="/login" className="btn-link">
-                    <Button buttonStyle="btn--outline">Login</Button>
-                  </Link>
-                ) : (
-                  <Link to="/login" className="btn-link" onClick={hideMenu}>
-                    <Button
-                      buttonStyle="btn--outline"
-                      buttonSize="btn--mobile"
-                      className="navbar-btn"
-                    >
-                      Login
-                    </Button>
-                  </Link>
-                )}
+          <div className="active">
+            <ul className={click ? "nav-menu active" : "nav-menu"}>
+              <li className="nav-item">
+                <Link
+                  to="/predictions"
+                  className="nav-links"
+                  onClick={hideMenu}
+                >
+                  Predictions
+                </Link>
               </li>
-            ) : (
-              <li className="nav-btn">
-                {button ? (
-                  <Link to="#" className="btn-link" onClick={logout}>
-                    <Button buttonStyle="btn--outline">Logout</Button>
-                  </Link>
-                ) : (
-                  <Link
-                    to="#"
-                    className="btn-link"
-                    onClick={() => {
-                      logout();
-                      hideMenu();
-                    }}
-                  >
-                    <Button
-                      buttonStyle="btn--outline"
-                      buttonSize="btn--mobile"
-                      className="navbar-btn"
-                    >
-                      Logout
-                    </Button>
-                  </Link>
-                )}
+              <li className="nav-item">
+                <Link to="/future" className="nav-links" onClick={hideMenu}>
+                  Future
+                </Link>
               </li>
-            )}
-            {props.user === "" ? (
-              <li className="nav-btn">
-                {button ? (
-                  <Link to="/register" className="btn-link">
-                    <Button
-                      buttonStyle="btn--outline"
-                      style={{
-                        padding: "0px 0px",
+              <li className="nav-item">
+                <Link to="/history" className="nav-links" onClick={hideMenu}>
+                  History
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link to="/WIP" className="nav-links" onClick={hideMenu}>
+                  Compare
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link
+                  to="/calc/payout"
+                  className="nav-links"
+                  onClick={hideMenu}
+                >
+                  Calculators
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link to="/WIP" className="nav-links" onClick={hideMenu}>
+                  FAQ
+                </Link>
+              </li>
+              {props.user === "" ? (
+                <li className="nav-btn">
+                  {button ? (
+                    <Link to="/login" className="btn-link">
+                      <Button buttonStyle="btn--outline">Login</Button>
+                    </Link>
+                  ) : (
+                    <Link to="/login" className="btn-link" onClick={hideMenu}>
+                      <Button
+                        buttonStyle="btn--outline"
+                        buttonSize="btn--mobile"
+                        className="navbar-btn"
+                      >
+                        Login
+                      </Button>
+                    </Link>
+                  )}
+                </li>
+              ) : (
+                <li className="nav-btn">
+                  {button ? (
+                    <Link to="#" className="btn-link" onClick={logout}>
+                      <Button buttonStyle="btn--outline">Logout</Button>
+                    </Link>
+                  ) : (
+                    <Link
+                      to="#"
+                      className="btn-link"
+                      onClick={() => {
+                        logout();
+                        hideMenu();
                       }}
                     >
-                      Register
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link to="/register" className="btn-link" onClick={hideMenu}>
-                    <Button
-                      buttonStyle="btn--outline"
-                      buttonSize="btn--mobile"
-                      className="navbar-btn btn--next"
+                      <Button
+                        buttonStyle="btn--outline"
+                        buttonSize="btn--mobile"
+                        className="navbar-btn"
+                      >
+                        Logout
+                      </Button>
+                    </Link>
+                  )}
+                </li>
+              )}
+              {props.user === "" ? (
+                <li className="nav-btn">
+                  {button ? (
+                    <Link to="/register" className="btn-link">
+                      <Button
+                        buttonStyle="btn--outline"
+                        style={{
+                          padding: "0px 0px",
+                        }}
+                      >
+                        Register
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/register"
+                      className="btn-link"
+                      onClick={hideMenu}
                     >
-                      Register
-                    </Button>
-                  </Link>
-                )}
-              </li>
-            ) : null}
-          </ul>
+                      <Button
+                        buttonStyle="btn--outline"
+                        buttonSize="btn--mobile"
+                        className="navbar-btn btn--next"
+                      >
+                        Register
+                      </Button>
+                    </Link>
+                  )}
+                </li>
+              ) : null}
+            </ul>
+          </div>
         </div>
       </div>
     </IconContext.Provider>

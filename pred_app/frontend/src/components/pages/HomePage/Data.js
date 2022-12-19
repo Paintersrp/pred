@@ -6,7 +6,7 @@ export const homeObjOne = {
   headline: "Machine Learning Predictions",
   description:
     "Model predictions based on analyzing 37 statistical features across 30000+ games.",
-  buttonLabel: "Today's Games",
+  buttonLabel: "Upcoming Games",
   imgStart: "",
   img: "images/basketball_3.svg",
   alt: "Basketball",

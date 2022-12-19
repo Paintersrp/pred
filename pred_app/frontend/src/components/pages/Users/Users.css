@@ -3,7 +3,7 @@
   background: #1c2237;
   padding: 0px 70px 0px 70px;
   display: none;
-  height: 700px;
+  height: 100%;
   width: 100%;
   font-weight: 600;
 }
@@ -15,7 +15,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 85vh;
+  height: 85%;
   border-top: 1px solid white;
   color: white;
 }

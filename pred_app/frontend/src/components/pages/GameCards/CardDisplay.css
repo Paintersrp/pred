@@ -16,12 +16,18 @@
 }
 
 .disclaimer-align {
-  text-align: left;
-  align-items: left;
+  text-align: center;
+  align-items: center;
+  padding: 2rem;
 }
 
 .date-head {
   padding: 10px 0px !important;
-  width: 25% !important;
-  min-width: 250px;
+  flex: 1;
+}
+
+@media screen and (max-width: 690px) and (orientation: portrait) {
+  .date-head {
+    max-width: 400px;
+  }
 }

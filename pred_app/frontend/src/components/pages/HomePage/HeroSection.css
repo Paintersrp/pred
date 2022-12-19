@@ -98,6 +98,13 @@ img {
   }
 }
 
+@media screen and (max-width: 991px) and (orientation: landscape) {
+  .container {
+    padding-right: 30px;
+    padding-left: 30px;
+  }
+}
+
 @media screen and (max-width: 768px) {
   .home__hero-text-wrapper {
     padding-bottom: 65px;

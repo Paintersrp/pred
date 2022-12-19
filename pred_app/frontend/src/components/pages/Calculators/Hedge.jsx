@@ -43,7 +43,7 @@ function Hedge() {
 
   return (
     <div className="layout flex-wrap">
-      <div className="setwidth max-w-[1000px] content-center border-r border-l">
+      <div className="setwidth content-center border-r border-l">
         <div className="calc-select flex flex-row">
           <Link to="/calc/payout" className="btn-link calc-btn-select">
             <button className="">Payout</button>

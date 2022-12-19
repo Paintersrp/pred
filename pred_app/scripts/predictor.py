@@ -586,7 +586,7 @@ class DailyPredictor(Predictor):
 
         final_data["Date"] = final_data["Date"].astype(str)
         final_data.to_json(
-            "C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
+            "C:/Python/pred_app/frontend/public/data/upcoming.json",
             orient="records",
         )
 

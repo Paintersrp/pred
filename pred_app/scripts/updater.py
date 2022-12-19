@@ -117,7 +117,7 @@ class Updater:
             )
 
             final_data.to_json(
-                "C:/Python/pred_app/pred_react_v2/public/data/per_game_team_stats.json",
+                "C:/Python/pred_app/frontend/public/data/per_game_team_stats.json",
                 orient="records",
             )
         else:
@@ -125,7 +125,7 @@ class Updater:
                 "team_stats", const.ENGINE, if_exists="replace", index=False
             )
             final_data.to_json(
-                "C:/Python/pred_app/pred_react_v2/public/data/per_100_team_stats.json",
+                "C:/Python/pred_app/frontend/public/data/per_100_team_stats.json",
                 orient="records",
             )
 
@@ -149,7 +149,7 @@ class Updater:
         )
 
         upcoming.to_json(
-            "C:/Python/pred_app/pred_react_v2/public/data/upcoming.json",
+            "C:/Python/pred_app/frontend/public/data/upcoming.json",
             orient="records",
         )
 
@@ -244,7 +244,9 @@ class Updater:
         pred_history_update = data[["Date", "A_Team", "A_Odds", "H_Team", "H_Odds"]]
 
         if features == const.NET_FULL_FEATURES:
+            print("YESSSSSSSSSSSS")
             old_pred_history = DATAHANDLER.prediction_history()
+            print(old_pred_history)
             old_pred_history = old_pred_history.rename(
                 columns={"Away": "A_Team", "Home": "H_Team"}
             )
@@ -255,6 +257,8 @@ class Updater:
                 .sort_values("Date", ascending=False)
                 .reset_index(drop=True)
             )
+
+            print(new_pred_history)
 
             new_pred_history.drop_duplicates(
                 subset=["Date", "A_Team"], keep="first", inplace=True
@@ -490,49 +494,52 @@ class Updater:
                 ]
 
                 if float(filtered_predicted.at[i, "A_Odds"]) > 0.5:
-                    filtered_predicted.at[i, "Pred"] = 0
+                    filtered_predicted.at[i, "Pred"] = "Away"
                 else:
-                    filtered_predicted.at[i, "Pred"] = 1
+                    filtered_predicted.at[i, "Pred"] = "Home"
 
                 if filtered_predicted.at[i, "MOV"] < 0:
-                    filtered_predicted.at[i, "Outcome"] = 0
+                    filtered_predicted.at[i, "Actual"] = "Away"
                 else:
-                    filtered_predicted.at[i, "Outcome"] = 1
+                    filtered_predicted.at[i, "Actual"] = "Home"
+
+                if (
+                    filtered_predicted.at[i, "Actual"]
+                    == filtered_predicted.at[i, "Pred"]
+                ):
+                    filtered_predicted.at[i, "Outcome"] = "Correct"
+                else:
+                    filtered_predicted.at[i, "Outcome"] = "Incorrect"
 
             new_history.append(filtered_predicted)
 
         new_history = pd.concat(new_history, axis=0, join="outer")
-        previous_history = DATAHANDLER.pred_scoring()
-        previous_history["Date"] = pd.to_datetime(previous_history["Date"]).dt.date
 
-        new_history = pd.concat([previous_history, new_history], axis=0, join="outer")
-        new_history.drop_duplicates(
-            subset=["Date", "A_Team", "H_Team"], keep="first", inplace=True
-        )
-        new_history = new_history.sort_values("Date", ascending=False).reset_index(
-            drop=True
-        )
+        # new_history = new_history.sort_values("Date", ascending=False).reset_index(
+        #     drop=True
+        # )
 
         new_history.to_sql(
             "prediction_scoring_v2", const.ENGINE, if_exists="replace", index=False
         )
 
         new_history["Date"] = new_history["Date"].astype(str)
+        new_history.to_csv("Test.csv", index=None)
 
         new_history.to_json(
-            "C:/Python/pred_app/pred_react_v2/public/data/pred_history.json",
+            "C:/Python/pred_app/frontend/public/data/pred_history.json",
             orient="records",
         )
 
-        correct = sum(new_history.Outcome == new_history.Pred)
-        incorrect = sum(new_history.Outcome != new_history.Pred)
+        correct = sum(new_history["Outcome"] == "Correct")
+        incorrect = sum(new_history["Outcome"] == "Incorrect")
         ratio = round(correct / (correct + incorrect) * 100, 2)
 
         scoring = pd.DataFrame([0, correct, incorrect, ratio]).T
         scoring.columns = ["index", "correct", "incorrect", "ratio"]
 
         scoring.to_json(
-            "C:/Python/pred_app/pred_react_v2/public/data/scoring.json",
+            "C:/Python/pred_app/frontend/public/data/scoring.json",
             orient="records",
         )
 
@@ -747,7 +754,7 @@ class Updater:
         elos.columns = ["Team", "ELO"]
 
         elos.to_json(
-            "C:/Python/pred_app/pred_react_v2/public/data/elos.json", orient="records"
+            "C:/Python/pred_app/frontend/public/data/elos.json", orient="records"
         )
 
         elos.to_sql("current_elos", const.ENGINE, if_exists="replace", index=False)

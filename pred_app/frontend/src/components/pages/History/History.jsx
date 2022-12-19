@@ -27,9 +27,9 @@ const Table = () => {
     { field: "A_Odds", minWidth: 125, flex: 1 },
     { field: "H_Team", minWidth: 200, flex: 1 },
     { field: "H_Odds", minWidth: 125, flex: 1 },
-    { field: "MOV", minWidth: 125, flex: 1 },
-    { field: "Outcome", minWidth: 125, flex: 1 },
     { field: "Pred", minWidth: 125, flex: 1 },
+    { field: "Outcome", minWidth: 125, flex: 1 },
+    { field: "MOV", minWidth: 125, flex: 1 },
   ]);
 
   const defaultColDef = useMemo(() => ({

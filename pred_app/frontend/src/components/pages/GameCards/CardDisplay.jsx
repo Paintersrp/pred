@@ -41,15 +41,25 @@ const GameCards = () => {
 
   return (
     <section className="layout flex flex-col">
-      <h2 className="text-white text-center mt-8 text-xl font-[500] border justify-center container date-head">
-        {today.toDateString()}
+      <h2 className="text-white text-center mt-8 text-xl font-[500] border-b justify-center container date-head">
+        {today.toLocaleDateString("en-us", {
+          weekday: "long",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })}
       </h2>
       <div className="container">
         {games ? <GameCard games={games} /> : null}
       </div>
-      <div className="border justify-center container date-head flex-col flex gap-3">
+      <div className="border-b justify-center container date-head flex-col flex gap-3">
         <h4 className="text-white text-center text-xl font-[500] gap-0">
-          {tomorrow.toDateString()}
+          {tomorrow.toLocaleDateString("en-us", {
+            weekday: "long",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
         </h4>
       </div>
       <div className="container">
