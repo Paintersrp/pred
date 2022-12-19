@@ -6,7 +6,7 @@ from scripts.const import NET_FULL_FEATURES
 from scripts.updater import Updater
 from scripts.predictor import DailyPredictor
 from scripts.ratings import current_elos
-from pred_print import update_today_card_data, update_tomorrow_card_data, update_odds
+from temp import update_today_card_data, update_tomorrow_card_data, update_odds
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
