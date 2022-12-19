@@ -41,20 +41,29 @@ function LoginForm(props) {
     setFormErrors(validate(formValues));
     setIsSubmit(true);
 
-    const response = await fetch("http://54.161.55.120:8000/api/login/", {
-      method: "POST",
-      // headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        formValues,
-        // password,
-      }),
-    });
+    // const response = await fetch("http://54.161.55.120:8000/api/login/", {
+    //   method: "POST",
+    //   // headers: { "Content-Type": "application/json" },
+    //   credentials: "include",
+    //   body: JSON.stringify({
+    //     formValues,
+    //   }),
 
-    const content = await response.json();
-    props.setUser(content.id);
+    const data = await axios
+      .post("http://54.161.55.120:8000/api/hedge/", formValues)
+      .then((res) => {
+        console.log(res.data);
+        // setOriginalPayout(res.data.original_payout);
+        // setBreakEven(res.data.break_even);
+        // setBreakEvenPayout(res.data.be_payout);
+        // setEqualReturn(res.data.equal_return);
+        // setEqualReturnPayout(res.data.er_payout);
+      });
 
-    if (response.status == 200) {
+    // const content = await response.json();
+    // props.setUser(content.id);
+
+    if (res.status == 200) {
       setRedirect(true);
     }
   };
