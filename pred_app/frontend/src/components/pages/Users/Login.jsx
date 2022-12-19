@@ -51,7 +51,7 @@ function LoginForm(props) {
     //   }),
 
     const data = await axios
-      .post("http://54.161.55.120:8000/api/hedge/", formValues)
+      .post("http://54.161.55.120:8000/api/login/", formValues)
       .then((res) => {
         console.log(res.data);
         // setOriginalPayout(res.data.original_payout);
