@@ -43,7 +43,7 @@ function LoginForm(props) {
 
     const response = await fetch("http://54.161.55.120:8000/api/login/", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
         formValues,
