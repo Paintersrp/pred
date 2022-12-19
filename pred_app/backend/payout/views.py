@@ -28,8 +28,11 @@ def payout_detail(request):
 
         print(dec, impl)
 
+        print(request.data)
+
         serializer = PayoutSerializer(data=request.data)
         if serializer.is_valid():
+            print("Tits")
             serializer.save()
             return Response(
                 data={
