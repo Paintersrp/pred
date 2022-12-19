@@ -5,7 +5,7 @@ from xgboost.sklearn import XGBClassifier
 """ SQLAlchemy Database Engine """
 
 # ENGINE = create_engine("sqlite:///C:\\Python\\pred_app\\\\pred.db")
-ENGINE = create_engine("sqlite:////home/ubuntu/pred/pred_app/pred2.db")
+ENGINE = create_engine("sqlite:////home/ubuntu/pred/pred_app/pred.db")
 
 """ Headers and URL for retrieving daily schedule """
 
