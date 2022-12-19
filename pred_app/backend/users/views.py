@@ -33,9 +33,9 @@ def register_view(request):
 @api_view(["GET", "POST"])
 def login_view(request):
     if request.method == "POST":
-        print(request.data["email"])
-        email = request.data["email"]
-        password = request.data["password"]
+        print(request.data["formValues"]["email"])
+        email = request.data["formValues"]["email"]
+        password = request.data["formValues"]["password"]
 
         user = Users.objects.filter(email=email).first()
 
