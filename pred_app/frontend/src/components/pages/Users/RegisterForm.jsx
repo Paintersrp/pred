@@ -65,7 +65,7 @@ function RegisterForm() {
     setFormErrors(validate(formValues));
 
     if (Object.keys(formErrors).length === 0) {
-      const response = await fetch("http://127.0.0.1:8000/api/register/", {
+      const response = await fetch("http://54.161.55.120:8000/api/register/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

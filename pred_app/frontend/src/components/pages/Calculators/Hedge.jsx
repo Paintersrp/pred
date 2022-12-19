@@ -30,7 +30,7 @@ function Hedge() {
     const calcNums = { wagerNum, oddsNum, hedgeNum, typeState };
 
     const data = await axios
-      .post("http://127.0.0.1:8000/api/hedge/", calcNums)
+      .post("http://54.161.55.120:8000/api/hedge/", calcNums)
       .then((res) => {
         console.log(res.data);
         setOriginalPayout(res.data.original_payout);

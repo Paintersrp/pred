@@ -27,7 +27,7 @@ function Hold() {
     const calcNums = { favNum, underNum, typeState };
 
     const data = await axios
-      .post("http://127.0.0.1:8000/api/hold/", calcNums)
+      .post("http://54.161.55.120:8000/api/hold/", calcNums)
       .then((res) => {
         console.log(res.data);
         setFavImplied(res.data.fav_implied);

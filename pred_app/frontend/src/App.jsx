@@ -20,7 +20,7 @@ function App() {
 
   useEffect(() => {
     (async () => {
-      const response = await fetch("http://127.0.0.1:8000/api/user/", {
+      const response = await fetch("http://54.161.55.120:8000/api/user/", {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
