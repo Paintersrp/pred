@@ -8,7 +8,7 @@ function WIP() {
       <div className="text-center text-[64px]">WIP</div>
       <div className="outer13 flex flex-col justify-center text-center">
         <div className="cl13 flex w-[100px] h-[100px] text-black text-center justify-center items-center">
-          I fucked your dad
+          I fucked your dad clown
         </div>
         HoverHere
       </div>
