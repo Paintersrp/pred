@@ -33,6 +33,7 @@ def register_view(request):
 @api_view(["GET", "POST"])
 def login_view(request):
     if request.method == "POST":
+        print(request.data)
         email = request.data["formValues"]["email"]
         password = request.data["formValues"]["password"]
 
