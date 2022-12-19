@@ -1,7 +1,7 @@
 import sys
 import json
 
-sys.path.insert(0, "C:/Python/pred_app")
+sys.path.insert(0, "/home/ubuntu/pred/pred_app/")
 
 import pandas as pd
 from fractions import Fraction
