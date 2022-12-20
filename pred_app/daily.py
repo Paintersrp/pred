@@ -11,7 +11,7 @@ from pred_print import update_today_card_data, update_tomorrow_card_data, update
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
-    # update_odds()
+    update_odds()
     Updater = Updater()
     DailyPredictor = DailyPredictor()
 
