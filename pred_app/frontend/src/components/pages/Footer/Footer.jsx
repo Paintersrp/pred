@@ -52,10 +52,10 @@ function Footer() {
           <div className="footer-logo">
             <Link to="/" className="social-logo">
               <FiDribbble className="navbar-icon" />
-              ROBOOKIE
+              RORACLE
             </Link>
           </div>
-          <small className="website-rights">ROBOOKIE © 2022</small>
+          <small className="website-rights">RORACLE © 2022</small>
           <div className="social-icons">
             <Link
               className="social-icon-link"

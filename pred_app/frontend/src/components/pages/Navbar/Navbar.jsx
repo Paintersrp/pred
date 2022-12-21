@@ -47,7 +47,7 @@ function Navbar(props) {
         <div className="navbar-container">
           <Link to="/" className="navbar-logo" onClick={hideMenu}>
             <FiDribbble className="navbar-icon" />
-            ROBOOKIE
+            RORACLE
           </Link>
           <div className="menu-icon" onClick={handleClick}>
             {click ? <FaTimes /> : <FaBars />}
